@@ -1,0 +1,55 @@
+There are two basic (but orthogonal) aspect of directory-file layouts
+used in tls-ca-manage.sh:
+
+   - Layout: Traditional OpenSSL and New Centralized
+   - Repo directory:  nested CA or single directory of CA directories
+
+# Layout
+The default OpenSSL directory layout (hereby called traditional) is
+given below:
+
+#  /etc/ssl ----> ca-root
+#                   |
+#                   +---> certs
+#                   +---> private
+#                   +---> newcerts
+#                   +---> crl
+
+The new centralized directory layout is:
+
+# /etc -> ssl -+-> ca -+-> ca-root -+-> private
+#              |                    +-> db
+#              |
+#              +-> etc
+#              +-> certs
+#              +-> crl
+
+In conjunction with one of the layout above, the repo nesting is:
+
+With traditional layout, nested CAs be like:
+
+# /etc -> ssl -> ca-root -+-> ca-network    +-> TLS-server
+#                         |                 +-> mail-server
+#                         |                 +-> web-server
+#                         |                 +-> SMTP-encryption
+#                         +-> ca-component ---> timestamp-server
+#                         +-> ca-identity  ---> employee-mail
+#                         +-> ca-security  -+-> card-key
+#                                           +-> guard-checkpoints
+
+With centralized layout, nested CAs be like:
+
+# /etc -> ssl -+-> ca -+-> ca-root -+-> private
+#              |                    +-> db
+#              |                    +-> ca-network +-> private
+#              |                                   +-> db
+#              |                                   +-> ca-mail +-> private
+#              |                                               +-> db
+#              +-> etc
+#              +-> certs
+#              +-> crl
+
+
+Inspired by: https://pki-tutorial.readthedocs.io/en/latest/expert/index.html
+
+
