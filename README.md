@@ -24,7 +24,32 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
   * 4096, 2048, 1024, 521, 512, 384, 256, 224, 192, 128
  * No root account required (enforces **`ssl-cert`** supplemental group)
 
+# Why Did I Make This?
+
+Bash!  Flexible!  Wrapping complex OpenSSL commands to a simple function call.
+
+There are OpenSSL encryption options that don't play well with other digest or bitsize settings.  It started out with parameter validation and explicitly telling you what options you can used with which (none of that man pages and connecting the dots there).
+
+## Nested CA 
+File organization for nested CAs also come in two flavors:
+* flat
+* nested-tree
+
+At first, I defaulted it to this nested-tree because OpenSSL team seems to like this, until a new layout came along.
+
+## New Directory Layout
+Later, I ran into an awesome [webpage](https://pki-tutorial.readthedocs.io/en/latest/expert/index.html#)  on Expert PKI (diagram and all).  But I noticed the new directory layout (diametrically different than traditional OpenSSL directory layout).  I'm  going to call it the 'centralized' directory layout.
+
+I too incorporated the new centralized directory layout into this `tls-ca-manage.sh` tool.  It could do either approach.  I defaulted it to the new centralized ones.
+
+# OpenSSL limitation
+Even with a carefully crafted OpenSSL configuration file, it is a hair-pulling experience to use the command line (especially 6-month later when you forget all those little things).   
+
+It is so bad that even EasyRSA has a problem staying current with the OpenSSL versions.  I wanted to avoid all that dependency of OpenSSL version (after starting with its v1.1.1, due to introduction of `openssl genpkey` command).
+
+
 # Syntax
+So, to make it easy, the syntax is about the CA node itself.  A simple filename for a simple CA node.  That's how simple it should be.
 ```
 tls-ca-manage.sh
     [ --help|-h ]
