@@ -1,11 +1,16 @@
 # tls-ca-managed
+Certificate Authority Management tool, written in bash shell.
 
- 
-Manage large number of TLS/SSL CA nodes, from Root CA down to nested intermediate CA nodes. yet another Certificate Authority Setup Tool
-Befuddled by OpenSSL myriads of command line options?Trying to get a crypto combination right?
+If you have ANY of the following:
 
-Fret no more, I did all the hard work and made it easy to support
-the following features:
+* befuddle by myriad of OpenSSL CLI options, particularly ecryption
+* a white lab or clean room
+* many CA nodes needed
+* have a private TLD domain name and infrastructure
+* have custom CA directory layouts to maintain
+* Experiment with highest-encryption CA nodes.
+
+Fret no more, this tool may help you.  I did all the hard work and made it easy to support the following features:
 
 * Different multi-directory layouts:
   - centralized or OpenSSL traditional
@@ -14,7 +19,9 @@ the following features:
   * SHA512, SHA384, SHA3-256, SHA3-224, SHA1, MD5
 * Cipher algorithms
   * ED25519, RSA, ECDSA, ChaCha20-Poly1305, AES
- * No root account required (requires **`ssl-cert`** supplemental group)
+* Encryption bit size
+  * 4096, 2048, 1024, 521, 512, 384, 256, 224, 192, 128
+ * No root account required (enforces **`ssl-cert`** supplemental group)
 
 # Syntax
 ```
@@ -24,7 +31,7 @@ tls-ca-manage.sh
     [ --topdir|-t <ssl-directory-path> ]  # (default: /etc/ssl)
     [ --algorithm|-a [rsa|ed25519|ecdsa|poly1305|aes256|aes512] ]  # (default: rsa)
     [ --message-digest|-m [sha512|sha384|sha256|sha224|sha1|md5] ]  # (default: sha256)
-    [ --keysize|-k [4096, 2048, 1024, 512, 256] ]  # (default: 2048)
+    [ --keysize|-k [4096, 2048, 1024, 512, 256] ]  # (default: 4096)
     [ --serial|-s <num> ]  # (default: 1000)
     [ --group|-g <group-name> ]  # (default: ssl-cert)
     [ -p | --parent-ca <parent-ca-name> ]  # (no default)
