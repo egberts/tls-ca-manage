@@ -49,7 +49,11 @@ It is so bad that even EasyRSA has a problem staying current with the OpenSSL ve
 
 
 # Syntax
-So, to make it easy, the syntax is about the CA node itself.  A simple filename for a simple CA node.  That's how simple it should be.
+So, to make it easy, the syntax is about the CA node itself.  A simple filename for a simple CA node.  
+
+Couple that with three basic commands:  Create, renew, and verify.
+
+That's how simple it should be.
 ```
 tls-ca-manage.sh
     [ --help|-h ]
