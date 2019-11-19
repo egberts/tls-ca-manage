@@ -1,5 +1,5 @@
-# tls-ca-managed
 Certificate Authority Management tool, written in bash shell.
+# tls-ca-managed
 
 If you have ANY of the following:
 
@@ -9,6 +9,7 @@ If you have ANY of the following:
 * have a private TLD domain name and infrastructure
 * have custom CA directory layouts to maintain
 * Experiment with highest-encryption CA nodes.
+* On a power-trip to having your very own Root CA
 
 Fret no more, this tool may help you.  I did all the hard work and made it easy to support the following features:
 
