@@ -71,15 +71,17 @@ tls-ca-manage.sh
 # Commands
     tls-ca-managed.sh  - Creates/Renew/Verify all CA nodes (root or intermediate)
     tls-create-server.sh - Adds all the end-CAs (TLS servers, ...)
-    Example test run:
-    tls-ca-managed.sh create root    # creates the Root CA under /etc/ssl
-    tls-ca-managed.sh verify root    # Verifies Root CA certificates
-    tls-ca-managed.sh -p root create network  # creates Network Intermediate CA
-    tls-ca-managed.sh -p root verify network  # Verifies Network CA certificates
+
+Example test runs:
+
+    tls-ca-managed.sh create root              # creates the Root CA under /etc/ssl
+    tls-ca-managed.sh verify root              # Verifies Root CA certificates
+    tls-ca-managed.sh -p root create network   # creates Network Intermediate CA
+    tls-ca-managed.sh -p root verify network   # Verifies Network CA certificates
     tls-ca-managed.sh -p root create identity  # creates Identity Intermediate CA
     tls-ca-managed.sh -p root create security  # creates Security Intermediate CA
-    tls-ca-managed.sh -b /tmp/etc/ssl root  # creates Root CA under /tmp/etc/ssl
-    tls-ca-managed.sh -t root  # creates Root CA in traditional
+    tls-ca-managed.sh -b /tmp/etc/ssl root     # creates Root CA under /tmp/etc/ssl
+    tls-ca-managed.sh -t root                  # creates Root CA in traditional
 
 
 Required Out-of-Band Setup:
@@ -97,7 +99,7 @@ end-servers' TLS/SSL.  Just a holding area of certificates.
 I've tried to give 'ssl-cert' group access to end-server(s) but realized
 that would be giving away the TLS/SSL store too much.
 You create the appropriate 'private' subdirectory in each of the
-end-server's /etc//tls and COPY the certs over to that.
+end-server's /etc/<server-name>/<private-tls> and COPY their server-specific certs over to there.
 
 # Requirements
 
