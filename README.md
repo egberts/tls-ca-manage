@@ -42,6 +42,8 @@ Later, I ran into an awesome [webpage](https://pki-tutorial.readthedocs.io/en/la
 
 I too incorporated the new centralized directory layout into this `tls-ca-manage.sh` tool.  It could do either approach.  I defaulted it to the new centralized ones.
 
+All details regarding directory layouts are given here: [CA_DIRECTORY_LAYOUTS](https://github.com/egberts/tls-ca-manage/blob/master/CA_DIRECTORY_LAYOUTS)
+
 # OpenSSL limitation
 Even with a carefully crafted OpenSSL configuration file, it is a hair-pulling experience to use the command line (especially 6-month later when you forget all those little things).   
 
