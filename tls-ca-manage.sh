@@ -1,26 +1,116 @@
 #!/bin/bash
 #
-# File: tls-ca-manage.sh
+# NAME
+#     tls-ca-manage.sh - Manage Root and Intermediate Certificate Authorities
 #
-# Syntax:
-#  tls-ca-manage.sh
-#        [ --help|-h ]
-#        [ --verbosity|-v ]
-#        [ --topdir|-t <ssl-directory-path> ]  # (default: /etc/ssl)
-#        [ --algorithm|-a [rsa|ed25519|ecdsa|poly1305|aes256|aes512] ]  # (default: rsa)
-#        [ --message-digest|-m [sha512|sha384|sha256|sha224|sha1|md5] ]  # (default: sha256)
-#        [ --keysize|-k [4096, 2048, 1024, 512, 256] ]  # (default: 2048)
-#        [ --serial|-s <num> ]  # (default: 1000)
-#        [ --group|-g <group-name> ]  # (default: ssl-cert)
-#        [ -p | --parent-ca <parent-ca-name> ]  # (no default)
-#        create | renew | revoke | help
-#        <ca-name>
+# SYNOPSIS
+#     tls-ca-manage.sh [OPTION]... create [CA-NAME]
+#     tls-ca-manage.sh [OPTION]... verify [CA-NAME]
+#     tls-ca-manage.sh [OPTION]... renew [CA-NAME]
+#     tls-ca-manage.sh [OPTION]... revoke [CA-NAME]
+#
+# DESCRIPTION
+#    A front-end tool to OpenSSL that enables creation, renewal,
+#    revocation, and verification of Certificate Authorities (CA).
+#
+#    CA can be Root CA or Intermediate CA.
+#
+#    Mandatory  arguments  to  long  options are mandatory for
+#    short options too.
+#
+#    -a, --algorithm
+#        Selects the cipher algorithm.
+#        Valid algorithms are: rsa, ecdsa, poly1305, aes OR ed25519
+#        These value are case-sensitive.
+#        If no algorithm specified, then RSA is used by default.
+#
+#    -b, --base-dir
+#        The top-level directory of SSL, typically /etc/ssl
+#        Useful for testing this command in non-root shell
+#        or maintaining SSL certs elsewhere (other than /etc/ssl).
+#
+#    -e, --end-node
+#        Makes this CA the end-node where only signing CA is permitted.
+#        Not specifying --end-node option means more CA(s) may be
+#        branched off of this CA.
+#        Dictacts the 'pathlen=0' in basicConstraints during the
+#        CA Certificate Request stage.
+#
+#    -f, --force-delete
+#        Forces deletion of its specified CA's configuration file
+#        as pointed to by CA-NAME argument.
+#
+#    -g, --group
+#        Use this Unix group name for all files created or updated.
+#        Default is ssl-cert group.
+#
+#    -h, --help
+#
+#    -k, --key-size
+#        Specifies the number of bits in the key.  The choice of key
+#        size depends on the algorithm (-a) used.
+#        The key size does not need to be specified if using a default
+#        algorithm.  The default key size is 4096 bits.
+#
+#        Key size for ed25519 algorithm gets ignored here.
+#        Valid poly1305 key sizes are:
+#        Valid rsa key sizes are: 4096, 2048, 1024 or 512.
+#        Valid ecdsa key sizes are: 521, 384, 256, 224 or 192.
+#
+#    -m, --message-digest
+# blake2b512        blake2s256        gost              md4
+# md5               rmd160            sha1              sha224
+# sha256            sha3-224          sha3-256          sha3-384
+# sha3-512          sha384            sha512            sha512-224
+# sha512-256        shake128          shake256          sm3
+#
+#    -n, --nested-ca
+#        First chaining of first-level CAs are placed in subdirectory inside
+#        its Root CA directory, and subsequent chaining of second-level CA
+#        get nesting also in subdirectory inside its respective Intermediate
+#        CA directory.  Very few organizations use this.
+#
+#    -p, --parent-ca
+#        Specifies the Parent CA name.  It may often be the Root CA name
+#        or sometimes the Intermediate CA name.  The Parent CA name is
+#        the same CA-NAME used when creating the parent CA.
+#
+#    -r, --reason
+#        Specifies the reason for the revocation.
+#        The value can be one of the following: unspecified,
+#        keyCompromise, CACompromise, affiliationChanged,
+#        superseded, cessationOfOperation, certificateHold,
+#        and removeFromCRL. (from RFC5280)
+#        Used only with 'revoke' command
+#
+#    -s, --serial
+#        Speicifes the starting serial ID number to use in the certificate.
+#        The default serial ID is 1000.
+#
+#    -t, --traditional
+#        Indicates the standard OpenSSL directory layout.
+#        Default is to use the new centralized directory layout.
+#
+#    -v, --verbosity
+#        Sets the debugging level.
+#
+#       [ --base-dir|-b <ssl-directory-path> ]
+#       [ --algorithm|-a [rsa|ed25519|rsa|ecdsa|poly1305|aes256|aes512] ]
+#       [ --message-digest|-m [sha512|sha384|sha256|sha224|sha3-256|
+#                              sha3-224|sha3-512|sha1|md5] ]
+#       [ --keysize|-k [4096, 2048, 1024, 512, 256] ]
+#       [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID)
+#       [ --group|-g <group-name> ]  # (default: $DEFAULT_GROUP_NAME)
+#       [ --openssl|-o <openssl-binary-filespec ]  # (default: $OPENSSL)
+#       [ --parent-ca|-p ] [ --traditional|-t ]
+#       < create | renew | revoke | verify | help >
+#       <ca-name>
+#
+# Description:
+#    tls-ca-manage.sh
 #
 # Create a top-level or intermediate certificate authority (CA)
 #
-# Complete with all directories and file protections
-#
-# LFS/FSSTD:  Single directory for all CA (or a directory for each CA depth?)
 #
 # Makes one assumption: that the openssl.cnf is ALWAYS the filename (never tweaked)
 #                       Just that different directory has different openssl.cnf
@@ -85,6 +175,32 @@
 #    Binary format. Preferred format in Windows environments. Also the official
 #    format for Internet download of certificates and CRLs.  (Not used here)
 
+function cmd_show_syntax_usage {
+    echo """Usage:  $0
+        [ --help|-h ] [ --verbosity|-v ] [ --force-delete|-f ]
+        [ --base-dir|-b <ssl-directory-path> ]
+        [ --algorithm|-a [rsa|ed25519|rsa|ecdsa|poly1305|aes256|aes512] ]
+        [ --message-digest|-m [sha512|sha384|sha256|sha224|sha3-256|
+                               sha3-224|sha3-512|sha1|md5] ]
+        [ --keysize|-k [4096, 2048, 1024, 512, 256] ]
+        [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID)
+        [ --group|-g <group-name> ]  # (default: $DEFAULT_GROUP_NAME)
+        [ --openssl|-o <openssl-binary-filespec ]  # (default: $OPENSSL)
+        [ --parent-ca|-p ] [ --traditional|-t ]
+        < create | renew | revoke | verify | help >
+        <ca-name>
+
+Default settings:
+  Top-level SSL directory: $DEFAULT_SSL_DIR  Cipher: $DEFAULT_PEER_SIGNATURE
+  Digest: $DEFAULT_MESSAGE_DIGEST Keysize: $DEFAULT_KEYSIZE_BITS
+"""
+  exit 1
+}
+# Create a top-level or intermediate certificate authority (CA)
+#
+# Complete with all directories and file protections
+#
+# LFS/FSSTD:  Single directory for all CA (or a directory for each CA depth?)
 # Default values (tweakable)
 DEFAULT_CMD_MODE="verify"
 DEFAULT_GROUP_NAME="ssl-cert"
@@ -114,7 +230,7 @@ DEFAULT_CA_X509_OU="Trust Division"
 DEFAULT_CA_X509_EMAIL="ca.example@example.invalid"
 # Do not use HTTPS in X509_CRL (Catch-22)
 DEFAULT_CA_X509_CRL="http://example.invalid/ca/example-crl.crt"
-DEFAULT_CA_X509_URL_BASE="https://example.invalid/ca"
+DEFAULT_CA_X509_URL_BASE="http://example.invalid/ca"
 DEFAULT_CA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
 
 DEFAULT_INTCA_X509_COUNTRY="US"
@@ -124,8 +240,8 @@ DEFAULT_INTCA_X509_COMMON="ACME Internal Intermediate CA B2"
 DEFAULT_INTCA_X509_ORG="ACME Networks"
 DEFAULT_INTCA_X509_OU="Semi-Trust Department"
 DEFAULT_INTCA_X509_EMAIL="ca.subroot@example.invalid"
-DEFAULT_INTCA_X509_CRL="https://example.invalid/subroot-ca.crl"
-DEFAULT_INTCA_X509_URL_BASE="https://example.invalid/ca/subroot"
+DEFAULT_INTCA_X509_CRL="http://example.invalid/subroot-ca.crl"
+DEFAULT_INTCA_X509_URL_BASE="http://example.invalid/ca/subroot"
 DEFAULT_INTCA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
 
 
@@ -430,12 +546,14 @@ function change_owner_perm {
     CHOP_GROUP="$2"
     CHOP_PERM="$3"
     CHOP_FILESPEC="$4"
+
     chown "$CHOP_USER:$CHOP_GROUP" "$CHOP_FILESPEC"
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
       echo "Error $RETSTS setting $CHOP_USER:$CHOP_GROUP owner to $CHOP_FILESPEC; aborting..."
       exit ${RETSTS}
     fi
+
     chmod "$CHOP_PERM" "$CHOP_FILESPEC"
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
@@ -445,7 +563,16 @@ function change_owner_perm {
 }
 
 function create_ca_directory {
-    mkdir "$1"
+    if [[ -e $1 ]]; then
+        if [[ ! -d $1 ]]; then
+            echo "ERROR: Path $1 is not a directory; aborting."
+            exit 1
+        fi
+        # Else directory already exist, just keep going
+    else
+        [[ $VERBOSITY -gt 0 ]] && echo "mkdir $1"
+        mkdir "$1"
+    fi
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0750 "$1"
 }
 
@@ -457,6 +584,7 @@ function touch_ca_file {
         echo "(and untouchable); aborting..."
         exit 1
     fi
+    [[ $VERBOSITY -gt 0 ]] && echo "touch $1"
     touch "$1"
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$1"
 }
@@ -464,15 +592,21 @@ function touch_ca_file {
 function delete_dir {
     DELETE_DIR="${1:-/tmp/nope}"  # emergency undefined $1 protection
     if [[ -d "$DELETE_DIR" ]]; then
+        [[ $VERBOSITY -gt 0 ]] && echo "rm -rf $DELETE_DIR"
         rm -rf "$DELETE_DIR"
     fi
 }
 
 function delete_file {
     DELETE_FILE="${1:-/tmp/nope}"  # emergency undefined $1 protection
-    if [[ -f "$DELETE_DIR" ]]; then
+    if [[ -f "$DELETE_FILE" ]]; then
+        [[ $VERBOSITY -gt 0 ]] && echo "rm $DELETE_FILE"
         rm "$DELETE_FILE"
     fi
+}
+
+function delete_ca_config {
+    delete_file "$IA_OPENSSL_CNF"  # loses any user-customization(s)
 }
 
 function delete_ca_dirfiles {
@@ -491,7 +625,9 @@ function delete_ca_dirfiles {
     delete_file "$IA_INDEX_DB.attr"
     delete_file "$IA_INDEX_DB"
     delete_file "$IA_CRL_DB"
-    delete_file "$IA_OPENSSL_CNF_EXT"
+    if [[ $FORCE_DELETE_CONFIG -eq 1 ]]; then
+        delete_ca_config
+    fi
     delete_dir "$IA_KEY_DIR"
 
     # Last CA standing
@@ -528,6 +664,25 @@ function delete_ca_dirfiles {
 }
 
 function create_ca_dirfiles {
+    if [[ ! -e "$SSL_CA_DIR" ]]; then
+        CREATE_IA_DIR=
+        echo -n "Create $SSL_CA_DIR subdirectory? (Y/n): "
+        read -r CREATE_IA_DIR
+        if [[ "$CREATE_IA_DIR" =~ y|yes|Y|YES ]]; then
+            mkdir "$SSL_CA_DIR"
+            RETSTS=$?
+            [[ ${RETSTS} -ne 0 ]] && echo "Unable to create $SSL_CA_DIR subdirectory; aborting..." && exit 13  # EACCESS
+            [[ ${VERBOSITY} -ne 0 ]] && echo "Created $SSL_CA_DIR directory"
+        else
+            echo "Exiting..."
+            exit 1
+        fi
+    else
+        if [[ ! -d "$SSL_CA_DIR" ]]; then
+            echo "File '$SSL_CA_DIR' is not a directory."
+            exit 1
+        fi
+    fi
     create_ca_directory "$SSL_CA_DIR"
     create_ca_directory "$IA_DIR"
     create_ca_directory "$IA_EXT_DIR"
@@ -566,28 +721,6 @@ function data_entry_generic {
     X509_URL="$INPUT_DATA"
     input_data "CRL URL: " "$X509_CRL"
     X509_CRL="$INPUT_DATA"
-}
-
-function cmd_show_syntax_usage {
-    echo """
-Usage:  $0
-        [ --help|-h ]
-        [ --verbosity|-v ]
-        [ --base-dir|-b <ssl-directory-path> ]  # (default: $DEFAULT_SSL_DIR)
-        [ --algorithm|-a [rsa|ed25519|rsa|ecdsa|poly1305|aes256|aes512] ]  # (default: $DEFAULT_PEER_SIGNATURE)
-        [ --message-digest|-m [sha512|sha384|sha256|sha224|sha3-256|
-                               sha3-224|sha3-512|sha1|md5] ]  # (default: sha256)
-        [ --keysize|-k [4096, 2048, 1024, 512, 256] ]  # (default: $DEFAULT_KEYSIZE_BITS)
-        [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID)
-        [ --group|-g <group-name> ]  # (default: $DEFAULT_GROUP_NAME)
-        [ --openssl|-o <openssl-binary-filespec ]  # (default: $OPENSSL)
-        [ --traditional|-t ]
-        [ --parent-ca|-p ]
-        [ --dry-run|-d ]
-        create | renew | revoke | verify | help
-        <ca-name>
-"""
-  exit 1
 }
 
 function openssl_cnf_create_root_ca
@@ -641,7 +774,7 @@ crlnumber               = ${IA_CRL_DB}          # CRL number file
 database                = ${IA_INDEX_DB}        # Index file
 unique_subject          = no                    # Require unique subject
 default_days            = 3652                  # How long to certify for
-default_md              = sha256                # MD to use
+default_md              = ${MESSAGE_DIGEST}     # MD to use
 policy                  = match_pol             # Default naming policy
 email_in_dn             = no                    # Add email to cert DN
 preserve                = no                    # Keep passed DN ordering
@@ -766,7 +899,7 @@ crlnumber               = ${IA_CRL_DB}          # CRL number file
 database                = ${IA_INDEX_DB}        # Index file
 unique_subject          = no                    # Require unique subject
 default_days            = 730                   # How long to certify for
-default_md              = sha256                # MD to use
+default_md              = ${MESSAGE_DIGEST}     # MD to use
 policy                  = match_pol             # Default naming policy
 email_in_dn             = no                    # Add email to cert DN
 preserve                = no                    # Keep passed DN ordering
@@ -855,14 +988,14 @@ ECDSA.Certificate = server-ecdsa.pem
 function ca_create_public_key
 {
     # pre-privacy
-    touch "$IA_KEY_PEM"
+    touch_ca_file "$IA_KEY_PEM"
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_KEY_PEM"
 
     ${OPENSSL_GENPKEY} \
         ${OPENSSL_ALGORITHM} \
-        -outform PEM \
         -text \
         -out "${IA_KEY_PEM}"
+        # -outform PEM \
 
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
@@ -1016,11 +1149,11 @@ function ca_create_chain_certificate
 
 function ca_serialization_and_unique_filenames
 {
-    IA_SERIAL_ID_CURRENT=`cat ${IA_SERIAL_DB}`
-    ((IA_SERIAL_ID_OLD=$IA_SERIAL_ID_CURRENT-1))
-    ((IA_SERIAL_ID_NEXT=$IA_SERIAL_ID_CURRENT+1))
-    CA_NEWCERT_SERIAL_NEXT_PEM="$IA_NEWCERTS_ARCHIVE_DIR/${IA_SERIAL_ID_CURRENT}.pem"
-    CA_NEWCERT_SERIAL_PREV_PEM="$IA_NEWCERTS_ARCHIVE_DIR/${IA_SERIAL_ID_OLD}.pem"
+    PARENT_IA_SERIAL_ID_NEXT=`cat ${PARENT_IA_SERIAL_DB}`
+    PARENT_IA_NEWCERT_NEW_PEM="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${PARENT_IA_SERIAL_ID_NEXT}.pem"
+
+    ((PARENT_IA_SERIAL_ID_CURRENT=$PARENT_IA_SERIAL_ID_NEXT-1))
+    PARENT_IA_NEWCERT_CURRENT_PEM="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${PARENT_IA_SERIAL_ID_CURRENT}.pem"
 
     # TODO: This is where you insert serial no. into various filenames
     #       Probably want to serialize the private keys as well
@@ -1045,19 +1178,15 @@ function display_ca_certificate {
     fi
 }
 
-##################################################
-# CLI create command                             #
-##################################################
-function cmd_create_ca {
-
+function delete_any_old_ca_files {
     [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $IA_CA_TYPE certificate..."
     # Yeah, yeah, yeah; destructive but this is a new infrastructure
     if [[ -d "$IA_DIR" ]]; then
         echo "WHOA! Directory $IA_DIR already exist."
-        echo -n "Do you want to mass-delete $IA_DIR old-stuff? (N/yes): "
+        echo -n "Do you want to do mass-precision-delete $IA_DIR old-stuff? (N/yes): "
         read -r DELETE_IA_DIR
         if [[ "$DELETE_IA_DIR" =~ y|yes|Y|YES ]]; then
-            echo -n "Asking again: Do you want to mass-delete $IA_DIR? (N/yes): "
+            echo -n "Asking again: Do you want to selectively-delete $IA_DIR? (N/yes): "
             read -r DELETE_IA_DIR
             if [[ "$DELETE_IA_DIR" =~ y|yes|Y|YES ]]; then
                 if [[ -d "$IA_DIR" ]]; then
@@ -1066,37 +1195,40 @@ function cmd_create_ca {
                     echo "Path '$IA_DIR' is not a directory; Exiting..."; exit 1
                 fi
             else
-                echo "Exiting..."; exit 1
+                echo "Exiting..."
             fi
         else
             echo "Exiting..."; exit 1
         fi
     fi
+    [[ $FORCE_DELETE_CONFIG -eq 1 ]] && delete_ca_config
+}
 
-    if [[ ! -e "$SSL_CA_DIR" ]]; then
-        CREATE_IA_DIR=
-        echo -n "Create $SSL_CA_DIR subdirectory? (Y/n): "
-        read -r CREATE_IA_DIR
-        if [[ "$CREATE_IA_DIR" =~ y|yes|Y|YES ]]; then
-            mkdir "$SSL_CA_DIR"
-            RETSTS=$?
-            [[ ${RETSTS} -ne 0 ]] && echo "Unable to create $SSL_CA_DIR subdirectory; aborting..." && exit 13  # EACCESS
-            [[ ${VERBOSITY} -ne 0 ]] && echo "Created $SSL_CA_DIR directory"
-        else
-            echo "Exiting..."
-            exit 1
-        fi
-    else
-        if [[ ! -d "$SSL_CA_DIR" ]]; then
-            echo "File '$SSL_CA_DIR' is not a directory."
+
+##################################################
+# CLI create command                             #
+##################################################
+function cmd_create_ca {
+
+    delete_any_old_ca_files
+
+    create_ca_dirfiles
+
+    if [[ ${VERBOSITY} -ne 0 ]]; then
+        echo "$IA_CA_TYPE subdirectory:  $(ls -1lad "$SSL_CA_DIR"/)"
+    fi
+
+    cd "$SSL_CA_DIR" || exit 65  # ENOPKG
+
+    #  If parental CA specified
+    if [[ "$NO_PARENT" -ne 1 ]]; then
+        #  determine if parental CA exist
+        if [[ ! -f "$PARENT_IA_OPENSSL_CNF" ]]; then
+            echo "Bad --parent-ca $PARENT_IA_NAME option; "
+            echo "Root CA $PARENT_IA_OPENSSL_CNF does not exist; exiting..."
             exit 1
         fi
     fi
-    create_ca_dirfiles
-
-    [[ ${VERBOSITY} -ne 0 ]] &&  echo "$IA_CA_TYPE subdirectory:  $(ls -1lad "$SSL_CA_DIR"/)"
-
-    cd "$SSL_CA_DIR" || exit 65  # ENOPKG
 
     # Clone OpenSSL configuration file into CA-specific subdirectory
     if [[ ! -f "$IA_OPENSSL_CNF" ]]; then
@@ -1113,23 +1245,33 @@ function cmd_create_ca {
             openssl_cnf_create_root_ca
         fi
     fi
+    if [[ "$DEPTH_MODE" == "intermediate" ]]; then
+        echo "Using $IA_OPENSSL_CNF configuration file for $IA_CA_TYPE type."
+    else
+        echo "Using $PARENT_IA_OPENSSL_CNF configuration file for $IA_CA_TYPE type."
+    fi
 
     # OpenSSL serial accounting
     echo "$STARTING_SERIAL_ID" > "$IA_SERIAL_DB"
     echo "$STARTING_SERIAL_ID" > "$IA_CRL_DB"
 
     ca_serialization_and_unique_filenames
-    [[ ${VERBOSITY} -ne 0 ]] && echo "Serial ID (starting): $IA_SERIAL_ID_CURRENT"
+    [[ ${VERBOSITY} -ne 0 ]] && echo "Serial ID (starting): $PARENT_IA_SERIAL_ID_NEXT"
 
     [[ "$VERBOSITY" -ne 0 ]] && echo "Creating $IA_CA_TYPE private key ..."
 
     ca_create_public_key
 
+    # Create PKCS#10 (Certificate Signing Request)
     ca_create_csr
 
     ca_create_certificate
 
     ca_create_revocation_list
+
+    # Save Parent CA
+    REL_PARENT_IA_PATH=$(realpath --relative-to="$SSL_DIR" "$PARENT_IA_DIR")
+    echo "$REL_PARENT_IA_PATH" > "$IA_DIR/PARENT_CA"
 
     # Clean up
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_INDEX_DB"
@@ -1151,7 +1293,7 @@ function cmd_create_ca {
     echo "  $IA_CA_TYPE cert req   : $IA_CSR_PEM"
     echo "  $IA_CA_TYPE certificate: $IA_CERT_PEM"
     echo "  $IA_CA_TYPE private key: $IA_KEY_PEM"
-    echo "  $IA_CA_TYPE new cert   : $IA_NEWCERTS_ARCHIVE_DIR/$STARTING_SERIAL_ID.pem"
+    echo "  $IA_CA_TYPE new cert   : $PARENT_IA_NEWCERT_NEW_PEM"
     if [[ "$DEPTH_MODE" != "root" ]]; then
         echo "  $IA_CA_TYPE chain cert : $IA_CHAIN_PEM"
     fi
@@ -1164,7 +1306,7 @@ function cmd_create_ca {
 ##################################################
 function cmd_renew_ca {
 
-    ca_serialization_and_unqiue_filenames
+    ca_serialization_and_unique_filenames
 
     [[ ${VERBOSITY} -ne 0 ]] && echo "Calling renew certificate..."
     if [[ ! -f "$PARENT_IA_SERIAL_DB" ]]; then
@@ -1211,7 +1353,7 @@ function cmd_renew_ca {
     done
 
     # OpenSSL serial accounting
-    touch "$IA_INDEX_DB"
+    touch_ca_file "$IA_INDEX_DB"
 
     ca_extract_signing_request
 
@@ -1252,29 +1394,123 @@ function cmd_renew_ca {
     echo "  $IA_CA_TYPE cert req   : $IA_CSR_PEM"
     echo "  $IA_CA_TYPE certificate: $IA_CERT_PEM"
     echo "  $IA_CA_TYPE private key: $IA_KEY_PEM"
-    echo "  $IA_CA_TYPE new cert   : $IA_NEWCERTS_ARCHIVE_DIR/$IA_SERIAL_ID_NEXT.pem"
+    echo "  $IA_CA_TYPE new cert   : $PARENT_IA_NEWCERT_NEW_PEM"
     echo "  $IA_CA_TYPE chain cert : $IA_CHAIN_PEM"
     echo "  $IA_CA_TYPE CRL        : $IA_CRL_PEM"
     echo "  $IA_CA_TYPE extension  : $PARENT_IA_OPENSSL_CNF_EXT"
+}
+
+
+##################################################
+# CLI revoke command                             #
+##################################################
+function cmd_revoke_ca {
+    # Obtain current serial ID
+    NEXT_SERIAL_ID="`cat $IA_SERIAL_DB`"
+    CURRENT_SERIAL_ID=$(($NEXT_SERIAL_ID-1))
+
+    # Read serialized file from $IA_CERTS_DIR (./certs)
+    # -keyfile and -cert are not needed if an openssl.cnf is proper
+    REVOKING_CERT_FILE="$IA_NEWCERTS_ARCHIVE_DIR/$CURRENT_SERIAL_ID.pem"
+
+    ${OPENSSL_X509} -noout -text \
+        -in "$REVOKING_CERT_FILE"
+
+    echo "Certificate file: $REVOKING_CERT_FILE"
+    echo -n "Revoke above certificate? (y/N): "
+    read -r REVOKE_THIS_ONE
+    if [[ "$REVOKE_THIS_ONE" == "y" ]]; then
+
+        # openssl ca -revoke /etc/ssl/newcerts/1013.pem #replacing the serial number
+        ${OPENSSL_CA} -revoke "$REVOKING_CERT_FILE"
+        RETSTS=$?
+        if [[ $RETSTS -ne 0 ]]; then
+            echo "Error $RETSTS during `openssl ca`"
+            echo "Command used: $OPENSSL_CA -revoke $REVOKING_CERT_FILE"
+            exit $RETSTS
+        fi
+    fi
+
+    ca_create_revocation_list
 }
 
 ##################################################
 # CLI verify command                             #
 ##################################################
 function cmd_verify_ca {
-  [[ ${VERBOSITY} -ne 0 ]] && echo "Calling verify certificate..."
+    [[ ${VERBOSITY} -ne 0 ]] && echo "Calling verify certificate..."
+
+# You can use OpenSSL to check the consistency of a private key:
+# openssl rsa -in [privatekey] -check
+
+# For my forged keys it will tell you:
+# RSA key error: n does not equal p q
+
+# You can then compare the public key, for example by calculating the so-called SPKI SHA256 hash:
+# openssl pkey -in [privatekey] -pubout -outform der | sha256sum
+# openssl x509 -in [certificate] -pubkey |openssl pkey -pubin -pubout -outform der | sha256sum
+
+    echo "Verifying Public Key: $IA_KEY_PEM"
+    echo "against Certificate:  $IA_CERT_PEM"
+
     openssl x509 -noout -text -in "$IA_CERT_PEM"
 
-    IA_SERIAL_ID_CURRENT=`cat ${IA_SERIAL_DB}`
-    ((IA_SERIAL_ID_OLD=$IA_SERIAL_ID_CURRENT-1))
-    ((IA_SERIAL_ID_NEXT=$IA_SERIAL_ID_CURRENT+1))
-    CA_NEWCERT_SERIAL_PREV_PEM="$IA_NEWCERTS_ARCHIVE_DIR/${IA_SERIAL_ID_OLD}.pem"
-    CA_NEWCERT_SERIAL_NEXT_PEM="$IA_NEWCERTS_ARCHIVE_DIR/${IA_SERIAL_ID_NEXT}.pem"
+    TMP="$(mktemp -d)"
 
-    ${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_SERIAL_PREV_PEM" | ${OPENSSL_MD5}
-    ${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_SERIAL_NEXT_PEM" | ${OPENSSL_MD5}
-    ${OPENSSL_X509} -noout -modulus -in "$IA_CERT_PEM" | ${OPENSSL_MD5}
+    # Checking internal consistency of private key
+    openssl rsa -in "$IA_KEY_PEM" -check -noout
+
+    # Checking spkisha256 hash
+    hashkey=$(openssl pkey \
+        -in "$IA_KEY_PEM" \
+        -pubout \
+        -outform der \
+        | sha256sum)
+    hashcrt=$(openssl x509 \
+        -in "$IA_CERT_PEM" \
+        -pubkey \
+        | openssl pkey \
+        -pubin \
+        -pubout \
+        -outform der \
+        | sha256sum)
+    if [[ "${hashkey}" = "${hashcrt}" ]]; then
+        echo "SPKI SHA256 hash matches"
+    else
+        echo "SPKI SHA256 hash does not match"
+    fi
+
+    # check test signature
+    openssl x509 -in "$IA_CERT_PEM" -noout -pubkey > "${TMP}/pubkey.pem"
+    dd if=/dev/urandom of="${TMP}/rnd" bs=32 count=1 status=none
+    openssl rsautl -sign -pkcs \
+        -inkey "$IA_KEY_PEM" \
+        -in "${TMP}/rnd" \
+        -out "${TMP}/sig"
+    openssl rsautl -verify -pkcs \
+        -pubin \
+        -inkey "${TMP}/pubkey.pem" \
+        -in "${TMP}/sig" \
+        -out "${TMP}/check"
+    if cmp -s "${TMP}/check" "${TMP}/rnd"; then
+        echo "Signature ok"
+    else
+        echo "Signature verify failed"
+    fi
+
+    rm -rf "${TMP}"
+
+    IA_SERIAL_ID_NEXT=`cat ${IA_SERIAL_DB}`
+    ((IA_SERIAL_ID_CURRENT=$IA_SERIAL_ID_NEXT-1))
+    CA_NEWCERT_CURRENT_PEM="$IA_NEWCERTS_ARCHIVE_DIR/${IA_SERIAL_ID_CURRENT}.pem"
+
+    echo "$(${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_CURRENT_PEM" |
+${OPENSSL_MD5}) $CA_NEWCERT_CURRENT_PEM"
+    echo "$(${OPENSSL_X509} -noout -modulus -in $IA_CERT_PEM | ${OPENSSL_MD5}) $IA_CERT_PEM"
     echo "$(${OPENSSL_PKEY} -in "$IA_KEY_PEM" | ${OPENSSL_MD5}) $IA_KEY_PEM"
+
+    echo "CA-NAME $IA_NAME verified"
+
 }
 
 
@@ -1283,8 +1519,8 @@ function cmd_verify_ca {
 ##########################################################################
 
 # Call getopt to validate the provided input.
-options=$(getopt -o p:hvb:a:m:nk:c:s:g:t \
-          --long parent-ca:,help,verbosity,base-dir:,algorithm:,message-digest:,nested-ca,keysize:,config:,serial:,group:,traditional -- "$@")
+options=$(getopt -o p:hvb:a:m:nk:c:s:g:tf \
+          --long parent-ca:,help,verbosity,base-dir:,algorithm:,message-digest:,nested-ca,keysize:,serial:,group:,traditional,force-delete -- "$@")
 RETSTS=$?
 [[ ${RETSTS} -eq 0 ]] || {
     echo "Incorrect options provided"
@@ -1307,6 +1543,7 @@ VERBOSITY="$DEFAULT_VERBOSITY"
 OFSTD_LAYOUT="$DEFAULT_OFSTD_LAYOUT"
 OFSTD_DIR_TREE_TYPE="$DEFAULT_OFSTD_DIR_TREE_TYPE"
 DEPTH_MODE="root"
+FORCE_DELETE_CONFIG=0
 
 eval set -- ${options}
 while true; do
@@ -1316,6 +1553,9 @@ while true; do
         ;;
     -v|--verbosity)
         ((VERBOSITY=VERBOSITY+1))
+        ;;
+    -f|--force-delete)
+        FORCE_DELETE_CONFIG=1
         ;;
     --base-dir|-b)
         shift;  # The arg is next in position args
@@ -1463,6 +1703,11 @@ else
   X509_CRL="$DEFAULT_CA_X509_CRL"
 fi
 
+OPENSSL_GENPKEY="$OPENSSL genpkey"
+# The OpenSSL options -paramfile and -algorithm are mutually exclusive.
+# OPENSSL_ALGORITHM
+# MESSAGE_DIGEST
+# KEY_SIZE
 
 # -m [sha3-256|sha3-224|sha1|sha3-512|md5] ]
 # Select algorithm for peer signatures by client/server
@@ -1481,40 +1726,41 @@ if [[ "$PEER_SIGNATURE" == "ed25519" ]]; then
     esac
     OPENSSL_ALGORITHM="-algorithm ED25519"
 elif [[ "$PEER_SIGNATURE" == "poly1305" ]]; then
-    OPENSSL_ALGORITHM="-algorithm poly1305"
+    OPENSSL_GENPKEY="$OPENSSL chacha20"
+    # OPENSSL_ALGORITHM="-algorithm poly1305"   # That genpkey isn't working yet
+    OPENSSL_ALGORITHM=" -p "
     # Ignoring KEYSIZE_BITS
     case "$MESSAGE_DIGEST" in
-      des3|aes128|aes256|chacha20)
+      des3|sha512|aes128|aes256|chacha20)
         OPENSSL_ALGORITHM="$OPENSSL_ALGORITHM -$MESSAGE_DIGEST"
         ;;
       *)
         echo "Invalid Poly1305 $MESSAGE_DIGEST digest; valid digests are: "
-        echo "    chacha20, aes128, aes256, des3"
+        echo "    chacha20, sha512, aes128, aes256, des3"
         exit 1
         ;;
     esac
 elif [[ "$PEER_SIGNATURE" == "rsa" ]]; then
     # MESSAGE_DIGEST max at sha3-512
-    case "$KEYSIZE_BITS" in
-      512|1024|2048|4096)
+    if [[ ( "$KEYSIZE_BITS" -ge 512 ) && ( "$KEYSIZE_BITS" -le 8192 ) ]]; then
         OPENSSL_ALGORITHM="-algorithm rsa -pkeyopt rsa_keygen_bits:$KEYSIZE_BITS"
-        ;;
-      *)
+    else
         echo "Invalid RSA $KEYSIZE_BITS keysize; valid size are: "
-        echo "    4096, 2048, 1024, 512."
+        echo "    512 thru 8192."
         exit 1
-        ;;
-    esac
+    fi
 elif [[ "$PEER_SIGNATURE" == "aes" ]]; then
     OPENSSL_ALGORITHM="-algorithm aes -pkeyopt aes_keygen_bits:$KEYSIZE_BITS"
 elif [[ "$PEER_SIGNATURE" == "ecdsa" ]]; then
     case "$KEYSIZE_BITS" in
-      521|384|256|224|192|128)
+      521|384|256|224|192)
+        # TLDR: don't use -param_enc explicit
         OPENSSL_ALGORITHM="-algorithm EC -pkeyopt ec_paramgen_curve:P-$KEYSIZE_BITS"
         ;;
       *)
         echo "Invalid ECDSA $KEYSIZE_BITS keysize; valid size are: "
-        echo "    521, 384, 256, 224, 192, 128."
+        echo "    521, 384, 256, 224 or 192."
+        echo "Note: 224 and 192 are not supported by publically trusted CAs"
         exit 1
       ;;
     esac
@@ -1557,6 +1803,7 @@ fi
 # It's stupid that we have to export this OpenSSL configuration filespec
 # If we didn't, it would 'furtively' refer to it's built-in /usr/lib/openssl/openssl.cnf if no '-config' were used as 'strace -f' has shown.
 export OPENSSL_CONF="$IA_OPENSSL_CNF"
+export SSL_CERT_FILE="/dev/null"
 
 
 IA_SSLCFG="-config $IA_OPENSSL_CNF"
@@ -1571,7 +1818,6 @@ OPENSSL_RSA="$OPENSSL rsa"
 OPENSSL_MD5="$OPENSSL md5"
 OPENSSL_CA="$OPENSSL ca ${IA_CA_SSLCFG}"
 [[ ${VERBOSITY} -ne 0 ]] && OPENSSL_CA="${OPENSSL_CA} -verbose"
-OPENSSL_GENPKEY="$OPENSSL genpkey"
 OPENSSL_PKEY="$OPENSSL pkey"
 
 case "$CMD_MODE" in
@@ -1587,6 +1833,9 @@ case "$CMD_MODE" in
     ;;
   renew)
     cmd_renew_ca
+    ;;
+  revoke)
+    cmd_revoke_ca
     ;;
   *)
     echo "Invalid command '$CMD_MODE'"

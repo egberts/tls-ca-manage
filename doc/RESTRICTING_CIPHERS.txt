@@ -1,0 +1,21 @@
+OpenSSL 1.1 uses an independent, new interface to set ciphersuits for TLSv1.3, the old ciphersuits interface is only effective up to TLSv1.2, so changing it has no effect for TLSv1.3. And as currently almost no application has adopted the new interface, there is no way to change ciphersuits for TLSv1.3.
+
+But there is a workaround: you can change the global openssl.cnf to modify the default TLSv1.3 ciphersuits for OpenSSL itself, so every program in the system will use the ciphersuits you specified.
+
+    openssl_conf = default_conf
+
+    [default_conf]
+    ssl_conf = ssl_sect
+
+    [ssl_sect]
+    system_default = system_default_sect
+
+    [system_default_sect]
+    # Note: TLSv1.2 ciphersuites are configured in the "CipherString" setting,
+    #       whereas TLSv1.3 ciphersuites in the "Ciphersuites" setting.
+    #       Don't mix and match between the two!!
+    # Ciphersuites = TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+    Ciphersuites = TLS_CHACHA20_POLY1305_SHA256:TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256
+    CipherString = DEFAULT@SECLEVEL=2
+
+
