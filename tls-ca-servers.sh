@@ -1,26 +1,34 @@
 #!/bin/bash
 #
-# NAME
-#     tls-ca-manage.sh - Manage Root and Intermediate Certificate Authorities
+# tls-ca-servers.sh
+#     Create a signing Certificate Authority (below Root and Intermediate CA)
 #
 # SYNOPSIS
-#     tls-ca-manage.sh [OPTION]... create [CA-NAME]
-#     tls-ca-manage.sh [OPTION]... verify [CA-NAME]
-#     tls-ca-manage.sh [OPTION]... renew [CA-NAME]
-#     tls-ca-manage.sh [OPTION]... revoke [CA-NAME]
+#     tls-ca-servers.sh [OPTION]... create [TYPE] [SIGN-CA-NAME]
+#     tls-ca-servers.sh [OPTION]... verify [SIGN-CA-NAME]
+#     tls-ca-servers.sh [OPTION]... renew [SIGN-CA-NAME]
+#     tls-ca-servers.sh [OPTION]... revoke [SIGN-CA-NAME]
 #
 # DESCRIPTION
 #    A front-end tool to OpenSSL that enables creation, renewal,
-#    revocation, and verification of Certificate Authorities (CA).
+#    revocation, and verification of Signing Certificate Authorities (signCA).
 #
-#    CA can be Root CA or Intermediate CA.
+#    SIGN-CA-NAME is a user-definable filename of which various prefix
+#    and suffix are appended for different CA-related files/directories.
+#    SIGN-CA-NAME must be a valid filename (without any slash).
 #
-#    Mandatory  arguments  to  long  options are mandatory for
-#    short options too.
+#    For 'create' command, TYPE shall be any of the following:
+#
+#    ocsp
+#
+#
+#
+#    Mandatory  arguments to long options are mandatory for
+#    short options too.  OPTIONs are:
 #
 #    -a, --algorithm
 #        Selects the cipher algorithm.
-#        Valid algorithms are: rsa, ecdsa, poly1305 OR ed25519
+#        Valid algorithms are: rsa, ecdsa, poly1305, aes OR ed25519
 #        These value are case-sensitive.
 #        If no algorithm specified, then RSA is used by default.
 #
@@ -28,10 +36,6 @@
 #        The top-level directory of SSL, typically /etc/ssl
 #        Useful for testing this command in non-root shell
 #        or maintaining SSL certs elsewhere (other than /etc/ssl).
-#
-#    -c, --cipher
-#        Specify the encryption method of the PEM key file in
-#        which to protect the key with.  Default is plaintext file.
 #
 #    -f, --force-delete
 #        Forces deletion of its specified CA's configuration file
@@ -42,24 +46,6 @@
 #        Default is ssl-cert group.
 #
 #    -h, --help
-#
-#    -i, --intermediate-node
-#        Makes this CA the intermediate node where additional CA(s)
-#        can be branched from this CA.  Root CA is also an intermediate
-#        node but top-level, self-signed intermediate node.
-#
-#        Not specifying --intermediate-node option means that this CA
-#        cannot borne any additional CA branches and can only sign
-#        other certificates.
-#
-#        Dictacts the presence of 'pathlen=0' in basicConstraints
-#        during the CA Certificate Request stage.
-#
-#        Not specifying --parent-ca and not specifying --intermediate-node
-#        means this certificate is a self-signed standalone
-#        test certificate which cannot sign any other certificate.
-#
-#        If --intermediate-node and no --parent-ca, creates your Root CA.
 #
 #    -k, --key-size
 #        Specifies the number of bits in the key.  The choice of key
@@ -99,9 +85,8 @@
 #        Used only with 'revoke' command
 #
 #    -s, --serial
-#        Specifies the starting serial ID number to use in the certificate.
-#        The default serial ID is 1000 HEXI-decimal.  Format of number are
-#        stored and handled in hexidecimal format of even number length.
+#        Speicifes the starting serial ID number to use in the certificate.
+#        The default serial ID is 1000.
 #
 #    -t, --traditional
 #        Indicates the standard OpenSSL directory layout.
@@ -111,11 +96,11 @@
 #        Sets the debugging level.
 #
 #       [ --base-dir|-b <ssl-directory-path> ]
-#       [ --algorithm|-a [rsa|ed25519|ecdsa|poly1305] ]
+#       [ --algorithm|-a [rsa|ed25519|rsa|ecdsa|poly1305|aes256|aes512] ]
 #       [ --message-digest|-m [sha512|sha384|sha256|sha224|sha3-256|
 #                              sha3-224|sha3-512|sha1|md5] ]
 #       [ --keysize|-k [4096, 2048, 1024, 512, 256] ]
-#       [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID_HEX)
+#       [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID)
 #       [ --group|-g <group-name> ]  # (default: $DEFAULT_GROUP_NAME)
 #       [ --openssl|-o <openssl-binary-filespec ]  # (default: $OPENSSL)
 #       [ --parent-ca|-p ] [ --traditional|-t ]
@@ -143,6 +128,109 @@
 #    not just reading certs'.
 #
 # Inspired by: https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
+#
+# Syntax:
+function cmd_show_syntax_usage {
+    echo """
+Usage:  $0 [ --help|-h ] [ --verbosity|-v ]
+    [ --base-dir|-b <ssl-directory-path> ]  # (default: $DEFAULT_SSL_DIR)
+    [ --algorithm|-a [rsa|ed25519|rsa|ecdsa|poly1305|aes256|aes512] ]  # (default: $DEFAULT_PEER_SIGNATURE)
+    [ --message-digest|-m [sha512|sha384|sha256|sha224|sha3-256|
+                           sha3-224|sha3-512|sha1|md5] ]  # (default: sha256)
+    [ --keysize|-k [4096, 2048, 1024, 512, 256] ]  # (default: $DEFAULT_KEYSIZE_BITS)
+    [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID)
+    [ --group|-g <group-name> ]  # (default: $DEFAULT_GROUP_NAME)
+    [ --openssl|-o <openssl-binary-filespec ]  # (default: $OPENSSL)
+    [ --parent-ca|-p ] [ --traditional|-t ]
+    < revoke | verify | create <identity|network|security> | renew | help >
+    <ca-name>
+
+    Examples:
+          $0 create -p root network server-farms
+          $0 renew server-farms
+          $0 revoke facility-cardkeys
+          $0 verify <any-ca-name>
+          $0 -a ecdsa -k 521 create network acme-network
+          $0 -a rsa -k 4096 create network acme-network
+          $0 -a poly1305 -m chacha20 create network acme-network
+    Note: If unsure on keysize, use '-a <cipher>' with any invalid
+          keysize for a verbose list of valid keysizes."""
+  exit 1
+}
+
+#
+# Complete with all directories and file protections
+#
+# LFS/FSSTD:  Single directory for all CA (or a directory for each CA depth?)
+#
+# Makes one assumption: that the openssl.cnf is ALWAYS the filename (never tweaked)
+#                       Just that different directory has different openssl.cnf
+#
+# Enforces 'ssl-cert' group; and requires all admins to have 'ssl-cert'
+#    group when using this command
+# DO NOT be giving 'ssl-cert' group to server daemons' supplemental
+#    group ID (or worse, as its group ID);
+#    for that, you copy the certs over to app-specific directory and use
+#    THAT app's file permissions.
+# This command does not deal with distribution of certificates, just
+#    creation/renewal/revokation of therein.
+# 'ssl-cert' group means 'working with SSL/TLS certificates,
+#    not just reading certs'.
+#
+# Inspired by: https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
+#
+# Components:
+# Public Key Infrastructure (PKI)
+#     Security architecture where trust is conveyed through the
+#     signature of a trusted CA.
+# Certificate Authority (CA)
+#     Entity issuing certificates and CRLs.
+# Registration Authority (RA)
+#     Entity handling PKI enrollment. May be identical with the CA.
+# Certificate
+#     Public key and ID bound by a CA signature.
+# Certificate Signing Request (CSR)
+#     Request for certification. Contains public key and ID to be certified.
+# Certificate Revocation List (CRL)
+#     List of revoked certificates. Issued by a CA at regular intervals.
+# Certification Practice Statement (CPS)
+#     Document describing structure and processes of a CA.
+#
+# CA Types:
+# Root CA
+#     CA at the root of a PKI hierarchy. Issues only CA certificates.
+# Intermediate CA
+#     CA below the root CA but not a signing CA. Issues only CA certificates.
+# Signing CA
+#     CA at the bottom of a PKI hierarchy. Issues only user certificates.
+#
+# Certificate Types:
+#
+# CA Certificate
+#     Certificate of a CA. Used to sign certificates and CRLs.
+# Root Certificate
+#     Self-signed CA certificate at the root of a PKI hierarchy. Serves as the
+#     PKI’s trust anchor.
+# Cross Certificate
+#     CA certificate issued by a CA external to the primary PKI hierarchy.
+#     Used to connect two PKIs and thus usually comes in pairs.
+# User Certificate
+#     End-user certificate issued for one or more purposes:
+#         email-protection, server-auth, client-auth,
+#         code-signing, etc.
+#     A user certificate cannot sign other certificates.
+#
+# File Format:
+# Privacy Enhanced Mail (PEM)
+#    Text format. Base-64 encoded data with header and footer lines.
+#    Preferred format in OpenSSL and most software based on it
+#    (e.g. Apache mod_ssl, stunnel).
+#
+# Distinguished Encoding Rules (DER)
+#    Binary format. Preferred format in Windows environments.
+#    Also the official format for Internet download of certificates and
+#    CRLs.  (Not used here)
+
 #
 # Components:
 # Public Key Infrastructure (PKI)
@@ -195,11 +283,11 @@ function cmd_show_syntax_usage {
     echo """Usage:  $0
         [ --help|-h ] [ --verbosity|-v ] [ --force-delete|-f ]
         [ --base-dir|-b <ssl-directory-path> ]
-        [ --algorithm|-a [rsa|ed25519|ecdsa|poly1305] ]
+        [ --algorithm|-a [rsa|ed25519|rsa|ecdsa|poly1305|aes256|aes512] ]
         [ --message-digest|-m [sha512|sha384|sha256|sha224|sha3-256|
                                sha3-224|sha3-512|sha1|md5] ]
         [ --keysize|-k [4096, 2048, 1024, 512, 256] ]
-        [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID_HEX)
+        [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID)
         [ --group|-g <group-name> ]  # (default: $DEFAULT_GROUP_NAME)
         [ --openssl|-o <openssl-binary-filespec ]  # (default: $OPENSSL)
         [ --parent-ca|-p ] [ --traditional|-t ]
@@ -218,8 +306,6 @@ Default settings:
 #
 # LFS/FSSTD:  Single directory for all CA (or a directory for each CA depth?)
 # Default values (tweakable)
-# DEFAULT_CIPHER="des-ede3-cbc"
-DEFAULT_CIPHER=
 DEFAULT_CMD_MODE="verify"
 DEFAULT_GROUP_NAME="ssl-cert"
 DEFAULT_KEYSIZE_BITS=4096
@@ -227,7 +313,7 @@ DEFAULT_MESSAGE_DIGEST="sha256"
 # shellcheck disable=SC2230
 DEFAULT_OPENSSL=$(which openssl)
 DEFAULT_PEER_SIGNATURE="rsa"
-DEFAULT_SERIAL_ID_HEX=1000
+DEFAULT_SERIAL_ID=1000
 DEFAULT_SSL_DIR="/etc/ssl"
 DEFAULT_VERBOSITY=0
 DEFAULT_DRYRUN=0
@@ -248,7 +334,7 @@ DEFAULT_CA_X509_OU="Trust Division"
 DEFAULT_CA_X509_EMAIL="ca.example@example.invalid"
 # Do not use HTTPS in X509_CRL (Catch-22)
 DEFAULT_CA_X509_CRL="http://example.invalid/ca/example-crl.crt"
-DEFAULT_CA_X509_URL_BASE="http://example.invalid/ca"
+DEFAULT_CA_X509_URL_BASE="https://example.invalid/ca"
 DEFAULT_CA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
 
 DEFAULT_INTCA_X509_COUNTRY="US"
@@ -258,8 +344,8 @@ DEFAULT_INTCA_X509_COMMON="ACME Internal Intermediate CA B2"
 DEFAULT_INTCA_X509_ORG="ACME Networks"
 DEFAULT_INTCA_X509_OU="Semi-Trust Department"
 DEFAULT_INTCA_X509_EMAIL="ca.subroot@example.invalid"
-DEFAULT_INTCA_X509_CRL="http://example.invalid/subroot-ca.crl"
-DEFAULT_INTCA_X509_URL_BASE="http://example.invalid/ca/subroot"
+DEFAULT_INTCA_X509_CRL="https://example.invalid/subroot-ca.crl"
+DEFAULT_INTCA_X509_URL_BASE="https://example.invalid/ca/subroot"
 DEFAULT_INTCA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
 
 
@@ -792,7 +878,7 @@ crlnumber               = ${IA_CRL_DB}          # CRL number file
 database                = ${IA_INDEX_DB}        # Index file
 unique_subject          = no                    # Require unique subject
 default_days            = 3652                  # How long to certify for
-default_md              = ${MESSAGE_DIGEST}     # MD to use
+default_md              = sha256                # MD to use
 policy                  = match_pol             # Default naming policy
 email_in_dn             = no                    # Add email to cert DN
 preserve                = no                    # Keep passed DN ordering
@@ -917,7 +1003,7 @@ crlnumber               = ${IA_CRL_DB}          # CRL number file
 database                = ${IA_INDEX_DB}        # Index file
 unique_subject          = no                    # Require unique subject
 default_days            = 730                   # How long to certify for
-default_md              = ${MESSAGE_DIGEST}     # MD to use
+default_md              = sha256                # MD to use
 policy                  = match_pol             # Default naming policy
 email_in_dn             = no                    # Add email to cert DN
 preserve                = no                    # Keep passed DN ordering
@@ -1011,10 +1097,9 @@ function ca_create_public_key
 
     ${OPENSSL_GENPKEY} \
         ${OPENSSL_ALGORITHM} \
-        ${CIPHER_OPTION} \
         -text \
-        -outform PEM \
         -out "${IA_KEY_PEM}"
+        # -outform PEM \
 
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
@@ -1044,7 +1129,7 @@ function ca_create_csr
 {
     ${OPENSSL_REQ} -new \
         -key "$IA_KEY_PEM" \
-        "-$MESSAGE_DIGEST" \
+        -"$MESSAGE_DIGEST" \
         -out "$IA_CSR_PEM"
         # -subj "/C=${X509_COUNTRY}/CN=${X509_COMMON}/O=${X509_ORG}/OU=${X509_OU}" \
     RETSTS=$?
@@ -1077,7 +1162,7 @@ function ca_create_certificate {
         -in "$IA_CSR_PEM" \
         -days 3650 \
         -md "$MESSAGE_DIGEST" \
-        -keyfile "$PARENT_IA_KEY_PEM" \
+        -key "$PARENT_IA_KEY_PEM" \
         -out "$IA_CERT_PEM"
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
@@ -1166,32 +1251,12 @@ function ca_create_chain_certificate
     fi
 }
 
-function hex_increment
-{
-    HEX_VALUE=$1
-    DECIMAL_VALUE=$(echo "ibase=16; $HEX_VALUE" | bc)
-    ((DECIMAL_VALUE_NEXT=$DECIMAL_VALUE+1))
-    HEX_VALUE_NEXT=$(echo "obase=16; $DECIMAL_VALUE_NEXT" | bc)
-}
-
-function hex_decrement
-{
-    HEX_VALUE=$1
-    DECIMAL_VALUE=$(echo "ibase=16; $HEX_VALUE" | bc)
-    ((DECIMAL_VALUE_PREV=$DECIMAL_VALUE-1))
-    HEX_VALUE_PREV=$(echo "obase=16; $DECIMAL_VALUE_PREV" | bc)
-}
-
 function ca_serialization_and_unique_filenames
 {
-    # Serial (and CRL) are stored in even-sized hex-format
     PARENT_IA_SERIAL_ID_NEXT=`cat ${PARENT_IA_SERIAL_DB}`
-
-    # CERT file are stored in HEX-digit format
     PARENT_IA_NEWCERT_NEW_PEM="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${PARENT_IA_SERIAL_ID_NEXT}.pem"
 
-    hex_decrement "$PARENT_IA_SERIAL_ID_NEXT"
-    PARENT_IA_SERIAL_ID_CURRENT="$HEX_VALUE_PREV"
+    ((PARENT_IA_SERIAL_ID_CURRENT=$PARENT_IA_SERIAL_ID_NEXT-1))
     PARENT_IA_NEWCERT_CURRENT_PEM="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${PARENT_IA_SERIAL_ID_CURRENT}.pem"
 
     # TODO: This is where you insert serial no. into various filenames
@@ -1446,8 +1511,7 @@ function cmd_renew_ca {
 function cmd_revoke_ca {
     # Obtain current serial ID
     NEXT_SERIAL_ID="`cat $IA_SERIAL_DB`"
-    hex_decrement "$NEXT_SERIAL_ID"
-    CURRENT_SERIAL_ID="$HEX_VALUE_PREV"
+    CURRENT_SERIAL_ID=$(($NEXT_SERIAL_ID-1))
 
     # Read serialized file from $IA_CERTS_DIR (./certs)
     # -keyfile and -cert are not needed if an openssl.cnf is proper
@@ -1541,8 +1605,7 @@ function cmd_verify_ca {
     rm -rf "${TMP}"
 
     IA_SERIAL_ID_NEXT=`cat ${IA_SERIAL_DB}`
-    hex_decrement "$IA_SERIAL_ID_NEXT"
-    IA_SERIAL_ID_CURRENT="$HEX_VALUE_PREV"
+    ((IA_SERIAL_ID_CURRENT=$IA_SERIAL_ID_NEXT-1))
     CA_NEWCERT_CURRENT_PEM="$IA_NEWCERTS_ARCHIVE_DIR/${IA_SERIAL_ID_CURRENT}.pem"
 
     echo "$(${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_CURRENT_PEM" |
@@ -1560,8 +1623,8 @@ ${OPENSSL_MD5}) $CA_NEWCERT_CURRENT_PEM"
 ##########################################################################
 
 # Call getopt to validate the provided input.
-options=$(getopt -o p:hvb:a:m:nk:c:s:g:tfc: \
-          --long parent-ca:,help,verbosity,base-dir:,algorithm:,message-digest:,nested-ca,keysize:,serial:,group:,traditional,force-delete,cipher: -- "$@")
+options=$(getopt -o p:hvb:a:m:nk:c:s:g:tf \
+          --long parent-ca:,help,verbosity,base-dir:,algorithm:,message-digest:,nested-ca,keysize:,serial:,group:,traditional,force-delete -- "$@")
 RETSTS=$?
 [[ ${RETSTS} -eq 0 ]] || {
     echo "Incorrect options provided"
@@ -1578,54 +1641,39 @@ KEYSIZE_BITS="$DEFAULT_KEYSIZE_BITS"
 MESSAGE_DIGEST="$DEFAULT_MESSAGE_DIGEST"
 OPENSSL="$DEFAULT_OPENSSL"
 PEER_SIGNATURE="$DEFAULT_PEER_SIGNATURE"
-STARTING_SERIAL_ID="$DEFAULT_SERIAL_ID_HEX"
+STARTING_SERIAL_ID="$DEFAULT_SERIAL_ID"
 SSL_DIR="$DEFAULT_SSL_DIR"
 VERBOSITY="$DEFAULT_VERBOSITY"
 OFSTD_LAYOUT="$DEFAULT_OFSTD_LAYOUT"
 OFSTD_DIR_TREE_TYPE="$DEFAULT_OFSTD_DIR_TREE_TYPE"
 DEPTH_MODE="root"
 FORCE_DELETE_CONFIG=0
-CIPHER="$DEFAULT_CIPHER"
 
 eval set -- ${options}
 while true; do
     case "$1" in
-    -a|--algorithm)
-        shift;
-        PEER_SIGNATURE=$1
-        [[ ! "$PEER_SIGNATURE" =~ ed25519|ecdsa|rsa|poly1305 ]] && {
-            echo "Incorrect algorithm '$PEER_SIGNATURE' option provided"
-            echo "Correct options are: rsa (default), ecdsa, ed25519, poly1305"
-            exit 1
-        }
+    -h|--help)
+        cmd_show_syntax_usage
+        ;;
+    -v|--verbosity)
+        ((VERBOSITY=VERBOSITY+1))
+        ;;
+    -f|--force-delete)
+        FORCE_DELETE_CONFIG=1
         ;;
     --base-dir|-b)
         shift;  # The arg is next in position args
         SSL_DIR=$1  # deferred argument checking
         ;;
-    -c|--cipher)
-        shift;  # The arg is next in position args
-        CIPHER=$1
+    --traditional|-t)
+        OFSTD_LAYOUT="traditional"
         ;;
-    -f|--force-delete)
-        FORCE_DELETE_CONFIG=1
-        ;;
-    -g|--group)
+    -a|--algorithm)
         shift;
-        SSL_GROUP_NAME=$1
-        ;;
-    -h|--help)
-        cmd_show_syntax_usage
-        ;;
-    --keysize|-k)
-        shift;
-        KEYSIZE_BITS=$1
-        ;;
-    -o|--openssl)
-        shift;
-        OPENSSL=$1
-        [[ ! -e "$OPENSSL" ]] && {
-            echo "Executable $OPENSSL is not found"
+        PEER_SIGNATURE=$1
+        [[ ! "$PEER_SIGNATURE" =~ aes|ed25519|ecdsa|rsa|poly1305 ]] && {
+            echo "Incorrect algorithm '$PEER_SIGNATURE' option provided"
+            echo "Correct options are: rsa (default), aes, ecdsa, ed25519, poly1305"
             exit 1
         }
         ;;
@@ -1638,19 +1686,29 @@ while true; do
     -n|-nested-ca)
         OFSTD_DIR_TREE_TYPE="hierarchy"
         ;;
-    -p|--parent-ca)
+    --keysize|-k)
         shift;
-        ARGOPT_PARENT_CA_NAME="$1"
+        KEYSIZE_BITS=$1
         ;;
     -s|--serial)
         shift;  # The arg is next in position args
         STARTING_SERIAL_ID=$1
         ;;
-    --traditional|-t)
-        OFSTD_LAYOUT="traditional"
+    -g|--group)
+        shift;
+        SSL_GROUP_NAME=$1
         ;;
-    -v|--verbosity)
-        ((VERBOSITY=VERBOSITY+1))
+    -o|--openssl)
+        shift;
+        OPENSSL=$1
+        [[ ! -e "$OPENSSL" ]] && {
+            echo "Executable $OPENSSL is not found"
+            exit 1
+        }
+        ;;
+    -p|--parent-ca)
+        shift;
+        ARGOPT_PARENT_CA_NAME="$1"
         ;;
     --)
         shift
@@ -1755,54 +1813,6 @@ OPENSSL_GENPKEY="$OPENSSL genpkey"
 # MESSAGE_DIGEST
 # KEY_SIZE
 
-# OpenSSH can accept private keys from one of the following file formats:
-#
-#   * raw RSA/PEM format,
-#   * RSA/PEM with encryption,
-#   * PKCS#8 with no encryption, or
-#   * PKCS#8 with encryption (which can be "old-style" or PBKDF2).
-#
-# For password protection of the private key, against attackers who
-# could steal a copy of your private key file, you really want to
-# use the last option: PKCS#8 with encryption with PBKDF2.
-# Unfortunately, with the openssl command-line tool, you cannot
-# configure PBKDF2 much; you cannot choose the hash function
-# (that's SHA-1, and that's it -- and that's not a real problem),
-# and, more importantly, you cannot choose the iteration count,
-# with a default of 2048 which is a bit low for comfort.
-#
-# You could encrypt your key with some other tool, with a higher
-# PBKDF2 iteration count, but I don't know of any readily available
-# tool for that. This would be a matter of some programming with
-# a crypto library.
-#
-# A good CA operator would have his own iterator.
-#
-# In any case, you'd better have a strong password. 15 random
-# lowercase letters (easy to type, not that hard to remember)
-# will offer 70 bits of entropy, which is quite enough to
-# thwart attackers, even when bad password derivation is
-# used (iteration count of 1).
-
-# If a cipher is specified then all PEM key files are encrypted with a password
-case "$CIPHER" in
-  aes128|aes256|"aes-256-cbc"|aes-128-cbc|des-ede3-cbc|camellia-256-cbc)
-    # Never use '-pass stdin' for password inputs because it 'echos' keystrokes
-    CIPHER_OPTION="-$CIPHER"
-    ;;
-  "")
-    CIPHER_OPTION=
-    ;;
-  *)
-    echo "Invalid ED25519 $CIPHER cipher; valid ciphers are: "
-    echo "    aes-256-cbc, aes-128-cbc, des-ede3-cbc and"
-    echo "    camellia-256-cbc"
-    echo "  See 'openssl list -cipher-algorithms' for supported encryption."
-    echo "  See 'openssl cipher -v' for supported encryption."
-    exit 1
-    ;;
-esac
-
 # -m [sha3-256|sha3-224|sha1|sha3-512|md5] ]
 # Select algorithm for peer signatures by client/server
 if [[ "$PEER_SIGNATURE" == "ed25519" ]]; then
@@ -1836,24 +1846,6 @@ elif [[ "$PEER_SIGNATURE" == "poly1305" ]]; then
     esac
 elif [[ "$PEER_SIGNATURE" == "rsa" ]]; then
     # MESSAGE_DIGEST max at sha3-512
-    case "$MESSAGE_DIGEST" in
-      md5|sha1|sha224|sha256| \
-      sha3-224|sha3-256|sha3-384| \
-      sha3-512|sha384|sha512| \
-      sha512-224|sha512-256| \
-      ssl3-md5| ssl3-sha1| \
-      rsa-sha1|rsa-sha224|rsa-sha256|rsa-sha384|rsa-sha512)
-        OPENSSL_ALGORITHM="$OPENSSL_ALGORITHM -$MESSAGE_DIGEST"
-        ;;
-      *)
-        echo "Invalid RSA $MESSAGE_DIGEST digest for REQ; valid digests are: "
-        echo "    sha512, sha384, sha256, sha224, sha1, md5,"
-        echo "    rsa-sha1, sha3-224, sha3-256, sha3-384, sha3-512,"
-        echo "    sha512-224, sha512-256, rsa-sha1, rsa-sha224, rsa-sha256,"
-        echo "    rsa-sha384, rsa-sha512."
-        exit 1
-        ;;
-    esac
     if [[ ( "$KEYSIZE_BITS" -ge 512 ) && ( "$KEYSIZE_BITS" -le 8192 ) ]]; then
         OPENSSL_ALGORITHM="-algorithm rsa -pkeyopt rsa_keygen_bits:$KEYSIZE_BITS"
     else
@@ -1861,6 +1853,8 @@ elif [[ "$PEER_SIGNATURE" == "rsa" ]]; then
         echo "    512 thru 8192."
         exit 1
     fi
+elif [[ "$PEER_SIGNATURE" == "aes" ]]; then
+    OPENSSL_ALGORITHM="-algorithm aes -pkeyopt aes_keygen_bits:$KEYSIZE_BITS"
 elif [[ "$PEER_SIGNATURE" == "ecdsa" ]]; then
     case "$KEYSIZE_BITS" in
       521|384|256|224|192)
@@ -1892,9 +1886,6 @@ else
   echo "Correct options are: rsa (default), aes, ecdsa, ed25519"
   exit 1
 fi
-OPENSSL_ALGORITHM="$OPENSSL_ALGORITHM $CIPHER_OPTION"
-
-
 [[ ${VERBOSITY} -ne 0 ]] && echo "Algorithm: $OPENSSL_ALGORITHM"
 
 

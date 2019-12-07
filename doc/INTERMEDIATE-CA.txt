@@ -1,0 +1,5 @@
+
+Intermediate CA
+
+keyUsage=critical,nonRepudiation,keyCertSign,cRLSign
+

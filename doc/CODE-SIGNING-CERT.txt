@@ -1,0 +1,9 @@
+Code Signing Certificate
+
+keyUsage=digitalSignature,keyEncipherment,keyAgreement (critical)
+
+crlDistributionPoints=URI:<crlUri> where <crlUri> is replaced with the URI where
+the certificate revocation list relating to the certificate is found
+
+subjectAltName=(as per §3.1.1.).
+

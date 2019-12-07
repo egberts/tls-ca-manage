@@ -1,0 +1,7 @@
+Client certificates
+
+keyUsage=digitalSignature,keyEncipherment,keyAgreement(critical)
+extendedKeyUsage=emailProtection,clientAuth,msEFS,msSGC,nsSGC
+
+
+

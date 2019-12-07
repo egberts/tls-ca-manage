@@ -1,0 +1,9 @@
+CodeSign
+
+openssl dgst -sha256 -sign my_private.key -out sign.txt.sha256 codeToSign.txt
+openssl enc -base64 -in sign.txt.sha256 -out sign.txt.sha256.base64
+
+Verifying codesign
+
+openssl enc -base64 -d -in sign.txt.sha256.base64 -out sign.txt.sha256
+openssl dgst -sha256 -verify public.key.pem -signature sign.txt.sha256 codeToSign.txt

@@ -1,0 +1,9 @@
+
+
+DSA requires checking
+
+  dsa_paramgen_bits   PARAMGEN >= 512
+  dsa_paramgen_q_bits QBITS 160, 224, 256
+  dsa_paramgen_md     PARAGEN MD sha1, sha224, sha256,
+  MD sha1, dsa, dsaWithSHA, sha224, sha256, sha384, sha512
+     sha3-224, sha3-256, sha3-384, sha3-512
