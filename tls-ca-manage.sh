@@ -103,7 +103,25 @@
 #        The default serial ID is 1000 HEXI-decimal.  Format of number are
 #        stored and handled in hexidecimal format of even number length.
 #
-#    -t, --traditional
+#    -t, --ca-type
+#        Specifies the type of CA node that this is going to be:
+#
+#          standalone   - self-signed test certificate
+#          root         - Top-most Root node of CA tree
+#          intermediate - Middle node of CA tree
+#          (signing)    - Signing CA, not an option; see below:
+#          server       - TLS server: Web server, MTA, VPN, IMAP server
+#          client       - TLS client:
+#          ocsp         - OCSP
+#          email        - Encryption part of SMTP body
+#          codesign     - Signed executable code
+#          identity     - Signing CA for E-Mail identity
+#          security     - Signing CA for security plant
+#          component    - Generic signing CA for network
+#          network      - Generic signing CA for network
+#          timestamping - ANSI X9.95 TimeStamping (RFC3161)
+#
+#    -T, --traditional
 #        Indicates the standard OpenSSL directory layout.
 #        Default is to use the new centralized directory layout.
 #
@@ -117,7 +135,7 @@
 #       [ --keysize|-k [4096, 2048, 1024, 512, 256] ]
 #       [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID_HEX)
 #       [ --group|-g <group-name> ]  # (default: $DEFAULT_GROUP_NAME)
-#       [ --openssl|-o <openssl-binary-filespec ]  # (default: $OPENSSL)
+#       [ --openssl|-o <openssl-binary-filespec> ]  # (default: $OPENSSL)
 #       [ --parent-ca|-p ] [ --traditional|-t ]
 #       < create | renew | revoke | verify | help >
 #       <ca-name>
@@ -202,10 +220,12 @@ function cmd_show_syntax_usage {
         [ --serial|-s <num> ]  # (default: $DEFAULT_SERIAL_ID_HEX)
         [ --group|-g <group-name> ]  # (default: $DEFAULT_GROUP_NAME)
         [ --openssl|-o <openssl-binary-filespec ]  # (default: $OPENSSL)
-        [ --parent-ca|-p ] [ --traditional|-t ]
+        [ --parent-ca|-p ] [-t|--ca-type <ca-type>] [ --traditional|-T ]
         < create | renew | revoke | verify | help >
         <ca-name>
 
+<ca-type>: standalone, root, intermediate, network, identity, component,
+           server, client, email, ocsp, timestamping, security, codesign
 Default settings:
   Top-level SSL directory: $DEFAULT_SSL_DIR  Cipher: $DEFAULT_PEER_SIGNATURE
   Digest: $DEFAULT_MESSAGE_DIGEST Keysize: $DEFAULT_KEYSIZE_BITS
@@ -236,6 +256,11 @@ DEFAULT_USER_NAME=${USER}  # tells most IDE syntax checker to say that $USER is 
 # DEFAULT_INT_CA_NAME="network"
 # DEFAULT_SIGNING_CA_NAME="component"
 
+DEFAULT_FILETYPE_CERT="crt"  # sometimes .pem, .cert, .cer
+DEFAULT_FILETYPE_KEY="key"   # sometimes .private
+DEFAULT_FILETYPE_CRL="crl"   # sometimes .revoke
+DEFAULT_FILETYPE_PFX="pfx"   # sometimes .p12
+
 DEFAULT_OFSTD_LAYOUT="centralized"
 DEFAULT_OFSTD_DIR_TREE_TYPE="flat"
 
@@ -247,7 +272,7 @@ DEFAULT_CA_X509_ORG="ACME Networks"
 DEFAULT_CA_X509_OU="Trust Division"
 DEFAULT_CA_X509_EMAIL="ca.example@example.invalid"
 # Do not use HTTPS in X509_CRL (Catch-22)
-DEFAULT_CA_X509_CRL="http://example.invalid/ca/example-crl.crt"
+DEFAULT_CA_X509_CRL="http://example.invalid/ca/example-crl.$DEFAULT_FILETYPE_CERT"
 DEFAULT_CA_X509_URL_BASE="http://example.invalid/ca"
 DEFAULT_CA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
 
@@ -490,19 +515,25 @@ function directory_file_layout {
         PARENT_IA_KEY_FNAME="${PARENT_IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
         IA_KEY_FNAME="${IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
     else
-        PARENT_IA_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX.key"
-        IA_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX.key"
-        CSR_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX.csr"
-        CERT_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX.crt"
-        PARENT_CERT_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX.crt"
-        IA_SERIAL_FNAME="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX.crt.srl"
-        IA_INDEX_FNAME="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX.$DB_DNAME"
-        IA_CRLNUMBER_FNAME="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX.crl"
-        PARENT_IA_SERIAL_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX.crt.srl"
-        PARENT_IA_INDEX_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX.$DB_DNAME"
-        PARENT_IA_CRLNUMBER_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX.crl"
+        FFNAME_KEY="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_KEY"
+        FFNAME_CSR="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CSR"
+        FFNAME_CERT="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CERT"
+        FFNAME_CSL="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CRL"
 
-        CRL_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX.crl"
+        PARENT_IA_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_KEY"
+        IA_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FFNAME_KEY"
+
+        CSR_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FFNAME_CSR"
+        CERT_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FFNAME_CERT"
+        PARENT_CERT_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CERT"
+        IA_SERIAL_FNAME="$FILENAME_PREFIX$IA_NAME$FFNAME_CRL.srl"
+        IA_INDEX_FNAME="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX.$DB_DNAME"
+        IA_CRLNUMBER_FNAME="$FILENAME_PREFIX$IA_NAME$FFNAME_CRL"
+        PARENT_IA_SERIAL_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CRL.srl"
+        PARENT_IA_INDEX_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX.$DB_DNAME"
+        PARENT_IA_CRLNUMBER_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CRL"
+
+        CRL_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FFNAME_CRL"
         CHAIN_FILENAME_MID="-chain"
         CHAIN_FILETYPE_SUFFIX=".pem"
         CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX$CHAIN_FILENAME_MID"
@@ -1493,14 +1524,36 @@ function cmd_verify_ca {
     echo "Verifying Public Key: $IA_KEY_PEM"
     echo "against Certificate:  $IA_CERT_PEM"
 
+    # check a certificate, its expiration date and who signed it
     openssl x509 -noout -text -in "$IA_CERT_PEM"
+    RETSTS=$?
+    if [[ $RETSTS -ne 0 ]]; then
+        echo "FAIL: Unable to view certificate: $IA_CSR_PEM"
+        exit 1
+    fi
 
     TMP="$(mktemp -d)"
 
     # Checking internal consistency of private key
     openssl rsa -in "$IA_KEY_PEM" -check -noout
 
-    # Checking spkisha256 hash
+    ########################################
+    # Check if Key and Certificate matches
+    ########################################
+
+    # Checking MD5 hash via modulus
+    hashkey=$($OPENSSL_X509 -noout -modulus -in $IA_CERT_PEM | \
+              $OPENSSL_MD5 )
+    hashcrt=$($OPENSSL_PKEY -noout -modulus -in $IA_KEY_PEM | \
+              $OPENSSL_MD5 )
+    if [[ "${hashkey}" = "${hashcrt}" ]]; then
+        echo "MD5 hash matches"
+    else
+        echo "FAIL: MD5 hash does not match"
+        exit 1
+    fi
+
+    # Checking SPKIsha256 hash
     hashkey=$(openssl pkey \
         -in "$IA_KEY_PEM" \
         -pubout \
@@ -1518,6 +1571,24 @@ function cmd_verify_ca {
         echo "SPKI SHA256 hash matches"
     else
         echo "SPKI SHA256 hash does not match"
+    fi
+
+    # Verify the CSR
+    openssl req -text -noout -verify -in "$IA_CSR_PEM"
+    RETSTS=$?
+    if [[ $RETSTS -ne 0 ]]; then
+        echo "CSR $IA_CSR_PEM: FAILED VERIFICATION"
+    else
+        echo "CSR $IA_CSR_PEM: verified"
+    fi
+
+    # Verify the key
+    openssl pkey -in "$IA_KEY_PEM" -check
+    RETSTS=$?
+    if [[ $RETSTS -ne 0 ]]; then
+        echo "Key $IA_KEY_PEM: FAILED VERIFICATION"
+    else
+        echo "Key $IA_KEY_PEM: verified"
     fi
 
     # check test signature
@@ -1560,8 +1631,8 @@ ${OPENSSL_MD5}) $CA_NEWCERT_CURRENT_PEM"
 ##########################################################################
 
 # Call getopt to validate the provided input.
-options=$(getopt -o p:hvb:a:m:nk:c:s:g:tfc: \
-          --long parent-ca:,help,verbosity,base-dir:,algorithm:,message-digest:,nested-ca,keysize:,serial:,group:,traditional,force-delete,cipher: -- "$@")
+options=$(getopt -o a:b:c:fg:hik:m:np:s:t:Tv \
+          --long algorithm:,base-dir:,cipher:,force-delete,group:,help,intermediate-node,keysize:,message-digest:,nested-ca,parent-ca:,serial:,ca-type:,traditional,verbose "$@")
 RETSTS=$?
 [[ ${RETSTS} -eq 0 ]] || {
     echo "Incorrect options provided"
@@ -1617,9 +1688,19 @@ while true; do
     -h|--help)
         cmd_show_syntax_usage
         ;;
+    -i|--intermediate-node)
+        INTERMEDIATE_NODE="yes"
+        ;;
     --keysize|-k)
         shift;
         KEYSIZE_BITS=$1
+        ;;
+    -m|--message-digest)
+        shift;
+        MESSAGE_DIGEST=$1
+        ;;
+    -n|-nested-ca)
+        OFSTD_DIR_TREE_TYPE="hierarchy"
         ;;
     -o|--openssl)
         shift;
@@ -1629,15 +1710,6 @@ while true; do
             exit 1
         }
         ;;
-    -m|--message-digest)
-        shift;
-        MESSAGE_DIGEST=$1
-        # Parital from 'openssl list -digest-algorithms'
-        # Validate this later because ordering of -m option is
-        ;;
-    -n|-nested-ca)
-        OFSTD_DIR_TREE_TYPE="hierarchy"
-        ;;
     -p|--parent-ca)
         shift;
         ARGOPT_PARENT_CA_NAME="$1"
@@ -1646,7 +1718,56 @@ while true; do
         shift;  # The arg is next in position args
         STARTING_SERIAL_ID=$1
         ;;
-    --traditional|-t)
+    -t|--ca-type)
+        shift;
+        CA_TYPE=$1
+        case "$CA_TYPE" in
+          standalone)
+            CA_TYPE="standalone"
+            ;;
+          root)
+            CA_TYPE="standalone"
+            ;;
+          intermediate)
+            CA_TYPE="standalone"
+            ;;
+          identity)
+            CA_TYPE="standalone"
+            ;;
+          network)
+            CA_TYPE="standalone"
+            ;;
+          component)
+            CA_TYPE="standalone"
+            ;;
+          security)
+            CA_TYPE="standalone"
+            ;;
+          server)
+            CA_TYPE="standalone"
+            ;;
+          client)
+            CA_TYPE="standalone"
+            ;;
+          ocsp)
+            CA_TYPE="standalone"
+            ;;
+          timestamping)
+            CA_TYPE="standalone"
+            ;;
+          email)
+            CA_TYPE="standalone"
+            ;;
+          codesign)
+            ;;
+          *)
+            echo "Error in --ca-type $CA_TYPE argument."
+            echo "Valid options are root, intermediate, identity"
+            exit -1
+            ;;
+        esac
+        ;;
+    -T|--traditional)
         OFSTD_LAYOUT="traditional"
         ;;
     -v|--verbosity)
@@ -1702,6 +1823,9 @@ if [[ ! -z "$ARGOPT_PARENT_CA_NAME" ]]; then
     CURRENT_ROOT_CA_NAME="$ARGOPT_PARENT_CA_NAME"
     DEPTH_MODE="intermediate"
     PARENT_IA_NAME="$CURRENT_ROOT_CA_NAME"
+    IA_HAS_PARENT="yes"
+else
+    IA_HAS_PARENT="no"
 fi
 
 # Check for oddball case that parent and ca have same name
@@ -1956,6 +2080,6 @@ case "$CMD_MODE" in
     ;;
 esac
 
-echo "Successfully completed; exiting..."
+echo "Successfully completed; exiting..." (RFC3161)
 
 exit 0
