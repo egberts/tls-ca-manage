@@ -1,0 +1,82 @@
+# all openssl.conf settings
+#
+# [default] is required
+[ default ]
+oid_file = <filespec_r>
+extensions =
+asn1 =   # used only in 'openssl asn1pars'
+default_ca = <custom_section_name>  #  CA_default?
+default_csr = <custom_section_name>  #  CSR_default?
+
+
+# 'openssl req' command section
+[ req ]
+# oid_file =
+default_md = <'default'|'ssl3-md5'|'ssl3-sha1'>
+x509_extensions = <custom_section_name>  # my_req_x509_extensions_section_name
+# input_password =
+# output_password =
+string_mask = <'utf8only'|string>
+utf8 =
+req_extensions = <custom_section_name>
+default_bits = 4096
+default_keyfile = <filespec_r>
+# encrypt_rsa_key = <'no'|'yes'>
+encrypt_key = <'no'|'yes'>
+prompt = no
+distinguished_name = <custom_section_name>  # my_req_dn_section_name
+attributes = <custom_section_name>  # my_req_attributes_section_name
+
+[ my_req_x509_extensions_section_name ]
+[ my_req_dn_section_name ]
+[ my_req_attributes_section_name ]
+
+# 'openssl ca' command section
+[ ca ]
+default_ca = <custom_section_name>
+oid_file = <filespec_r>
+string_mask = <'utf8only'|string>
+utf8 = <yes>
+unique_subject = <yes|no>
+database = <filespec_rw>
+private_key = <filespec_rw>
+certificate = <filespec_rw>
+preserve = <y|n>
+msie_hack = <y|n>
+name_opt = <esc_2253|esc_2254|esc_ctrl| esc_msb| use_quote|
+        utf8 | ignore_type | show_type | dump_all | dump_nostr |
+        dump_der | compat | sep_comma_plus | sep_comma_plus_space |
+        sep_semi_plus_space | sep_multiline | dn_rev | nofname |
+        sname | lname | align | oid | space_eq | dump_unknown |
+        RFC2253 | oneline | multiline | ca_default >
+cert_opt = < compatible | ca_default | no_header | no_version |
+        no_serial | no_signame | no_validity | no_subject |
+        no_issuer | no_pubkey | no_extensions | no_sigdump |
+        no_aux | no_attributes | ext_default | ext_error |
+        ext_parse | ext_dump>
+copy_extensions = <none|copy|copyall>
+new_certs_dir = <dirspec>
+default_md = <'default'|'sha256'|'sha128'|'ssl3-md5'|'ssl3-sha1'>
+email_in_dn = <'no'|email_address>
+default_email_in_dn = <'no'|email_address>
+policy = <custom_section_name>
+rand_serial = <anychar>  # prevents 'serial' from being considered
+serial = <filespec_rw>
+#  no '-extfile' option, so we look for 'x509_extensions' in the main
+#  configuration file
+x509_extensions = <custom_v3_section_name>
+default_startdate = <'today'|YYMMDDHHMMSSZ>
+default_enddate = <YYMMDDHHMMSSZ>
+default_days = <base10_integer>
+crl = <filespec>
+crl_extensions = <custom_section_name>
+crlnumber = <base10_integer>
+default_crl_days = <base10_integer>
+default_crl_hours = <base10_integer>
+
+
+# _suffix notations
+#   _min
+#   _max
+#   _default
+#   _value

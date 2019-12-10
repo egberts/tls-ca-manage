@@ -256,10 +256,11 @@ DEFAULT_USER_NAME=${USER}  # tells most IDE syntax checker to say that $USER is 
 # DEFAULT_INT_CA_NAME="network"
 # DEFAULT_SIGNING_CA_NAME="component"
 
-DEFAULT_FILETYPE_CERT="crt"  # sometimes .pem, .cert, .cer
 DEFAULT_FILETYPE_KEY="key"   # sometimes .private
+DEFAULT_FILETYPE_CSR="csr"   # sometimes .req, .request (PKCS#10)
+DEFAULT_FILETYPE_CERT="crt"  # sometimes .pem, .cert, .cer  (PKCS#7)
 DEFAULT_FILETYPE_CRL="crl"   # sometimes .revoke
-DEFAULT_FILETYPE_PFX="pfx"   # sometimes .p12
+DEFAULT_FILETYPE_PFX="pfx"   # sometimes .p12 (PKCS#12)
 
 DEFAULT_OFSTD_LAYOUT="centralized"
 DEFAULT_OFSTD_DIR_TREE_TYPE="flat"
@@ -515,31 +516,34 @@ function directory_file_layout {
         PARENT_IA_KEY_FNAME="${PARENT_IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
         IA_KEY_FNAME="${IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
     else
-        FFNAME_KEY="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_KEY"
-        FFNAME_CSR="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CSR"
-        FFNAME_CERT="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CERT"
-        FFNAME_CSL="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CRL"
+        FFNAME_KEY="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_KEY"  # '-ca.key'
+        FFNAME_CSR="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CSR"  # '-ca.csr'
+        FFNAME_CERT="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CERT"  # '-ca.crt'
+        FFNAME_CRL="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CRL"  # '-ca.crl'
 
         PARENT_IA_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_KEY"
         IA_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FFNAME_KEY"
 
         CSR_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FFNAME_CSR"
+        CRL_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FFNAME_CRL"
+
         CERT_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FFNAME_CERT"
         PARENT_CERT_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CERT"
-        IA_SERIAL_FNAME="$FILENAME_PREFIX$IA_NAME$FFNAME_CRL.srl"
+
+        IA_SERIAL_FNAME="$FILENAME_PREFIX$IA_NAME$FFNAME_CERT.srl"
         IA_INDEX_FNAME="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX.$DB_DNAME"
+        IA_KEY_FNAME="${IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
+
         IA_CRLNUMBER_FNAME="$FILENAME_PREFIX$IA_NAME$FFNAME_CRL"
-        PARENT_IA_SERIAL_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CRL.srl"
-        PARENT_IA_INDEX_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX.$DB_DNAME"
         PARENT_IA_CRLNUMBER_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CRL"
 
-        CRL_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FFNAME_CRL"
         CHAIN_FILENAME_MID="-chain"
         CHAIN_FILETYPE_SUFFIX=".pem"
         CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX$CHAIN_FILENAME_MID"
 
-        IA_KEY_FNAME="${IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
         PARENT_IA_KEY_FNAME="${PARENT_IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
+        PARENT_IA_SERIAL_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CRL.srl"
+        PARENT_IA_INDEX_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX.$DB_DNAME"
     fi
 
     IA_CSR_FNAME="${CSR_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
@@ -1509,7 +1513,7 @@ function cmd_revoke_ca {
 # CLI verify command                             #
 ##################################################
 function cmd_verify_ca {
-    [[ ${VERBOSITY} -ne 0 ]] && echo "Calling verify certificate..."
+    [[ ${VERBOSITY} -ne 0 ]] && echo "Verify certificate command..."
 
 # You can use OpenSSL to check the consistency of a private key:
 # openssl rsa -in [privatekey] -check
@@ -1521,9 +1525,7 @@ function cmd_verify_ca {
 # openssl pkey -in [privatekey] -pubout -outform der | sha256sum
 # openssl x509 -in [certificate] -pubkey |openssl pkey -pubin -pubout -outform der | sha256sum
 
-    echo "Verifying Public Key: $IA_KEY_PEM"
-    echo "against Certificate:  $IA_CERT_PEM"
-
+    # Visual Inspection:
     # check a certificate, its expiration date and who signed it
     openssl x509 -noout -text -in "$IA_CERT_PEM"
     RETSTS=$?
@@ -1532,19 +1534,39 @@ function cmd_verify_ca {
         exit 1
     fi
 
-    TMP="$(mktemp -d)"
+    echo "Key:         $IA_KEY_PEM"
+    echo "CSR:         $IA_KEY_PEM"
+    echo "Certificate: $IA_CERT_PEM"
 
-    # Checking internal consistency of private key
-    openssl rsa -in "$IA_KEY_PEM" -check -noout
+    # Verify the key
+    openssl pkey -noout -in "$IA_KEY_PEM" -check
+    RETSTS=$?
+    if [[ $RETSTS -ne 0 ]]; then
+        echo "Key $IA_KEY_PEM: FAILED VERIFICATION"
+    else
+        echo "Key $IA_KEY_PEM: verified"
+    fi
+
+    # Verify the CSR
+    openssl req -noout -verify -in "$IA_CSR_PEM"
+    RETSTS=$?
+    if [[ $RETSTS -ne 0 ]]; then
+        echo "CSR $IA_CSR_PEM: FAILED VERIFICATION"
+    else
+        echo "CSR $IA_CSR_PEM: verified"
+    fi
+
+
+    TMP="$(mktemp -d)"
 
     ########################################
     # Check if Key and Certificate matches
     ########################################
 
-    # Checking MD5 hash via modulus
-    hashkey=$($OPENSSL_X509 -noout -modulus -in $IA_CERT_PEM | \
+    # Checking MD5 hash
+    hashkey=$($OPENSSL_X509 -noout -in $IA_CERT_PEM | \
               $OPENSSL_MD5 )
-    hashcrt=$($OPENSSL_PKEY -noout -modulus -in $IA_KEY_PEM | \
+    hashcrt=$($OPENSSL_PKEY -noout -in $IA_KEY_PEM | \
               $OPENSSL_MD5 )
     if [[ "${hashkey}" = "${hashcrt}" ]]; then
         echo "MD5 hash matches"
@@ -1571,55 +1593,46 @@ function cmd_verify_ca {
         echo "SPKI SHA256 hash matches"
     else
         echo "SPKI SHA256 hash does not match"
+        exit 1
     fi
 
-    # Verify the CSR
-    openssl req -text -noout -verify -in "$IA_CSR_PEM"
-    RETSTS=$?
-    if [[ $RETSTS -ne 0 ]]; then
-        echo "CSR $IA_CSR_PEM: FAILED VERIFICATION"
-    else
-        echo "CSR $IA_CSR_PEM: verified"
+    if [[ "$PEER_SIGNATURE" == "rsa" ]]; then
+        # check test signature
+        # This is only valid with '--algorithm rsa' option
+        # openssl v1.1.1 hasn't finished Digital decryptor/encryptor for ecdsa...
+        openssl x509 -in "$IA_CERT_PEM" -noout -pubkey > "${TMP}/pubkey.pem"
+        dd if=/dev/urandom of="${TMP}/rnd" bs=32 count=1 status=none
+        openssl pkeyutl -sign \
+            -inkey "$IA_KEY_PEM" \
+            -in "${TMP}/rnd" \
+            -out "${TMP}/sig"
+        openssl pkeyutl -verifyrecover \
+            -inkey "${TMP}/pubkey.pem" \
+            -in "${TMP}/sig" \
+            -out "${TMP}/check"
+        if cmp -s "${TMP}/check" "${TMP}/rnd"; then
+            echo "PKCS PubKey Signature cross-verified"
+        else
+            echo "PKCS PubKey Signature cross-verify failed"
+            exit 1
+        fi
+
+        rm -rf "${TMP}"
+
+        IA_SERIAL_ID_NEXT=`cat ${IA_SERIAL_DB}`
+        hex_decrement "$IA_SERIAL_ID_NEXT"
+        IA_SERIAL_ID_CURRENT="$HEX_VALUE_PREV"
+        CA_NEWCERT_CURRENT_PEM="$IA_NEWCERTS_ARCHIVE_DIR/${IA_SERIAL_ID_CURRENT}.pem"
+
+        next_pem="$(${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_CURRENT_PEM" | ${OPENSSL_MD5})"
+        current_pem="$(${OPENSSL_X509} -noout -modulus -in $IA_CERT_PEM | ${OPENSSL_MD5})"
+        if [[ "$next_pem" == "$current_pem" ]]; then
+            echo "Archive matches"
+        else
+            echo "Archive mismatch"
+            exit 1
+        fi
     fi
-
-    # Verify the key
-    openssl pkey -in "$IA_KEY_PEM" -check
-    RETSTS=$?
-    if [[ $RETSTS -ne 0 ]]; then
-        echo "Key $IA_KEY_PEM: FAILED VERIFICATION"
-    else
-        echo "Key $IA_KEY_PEM: verified"
-    fi
-
-    # check test signature
-    openssl x509 -in "$IA_CERT_PEM" -noout -pubkey > "${TMP}/pubkey.pem"
-    dd if=/dev/urandom of="${TMP}/rnd" bs=32 count=1 status=none
-    openssl rsautl -sign -pkcs \
-        -inkey "$IA_KEY_PEM" \
-        -in "${TMP}/rnd" \
-        -out "${TMP}/sig"
-    openssl rsautl -verify -pkcs \
-        -pubin \
-        -inkey "${TMP}/pubkey.pem" \
-        -in "${TMP}/sig" \
-        -out "${TMP}/check"
-    if cmp -s "${TMP}/check" "${TMP}/rnd"; then
-        echo "Signature ok"
-    else
-        echo "Signature verify failed"
-    fi
-
-    rm -rf "${TMP}"
-
-    IA_SERIAL_ID_NEXT=`cat ${IA_SERIAL_DB}`
-    hex_decrement "$IA_SERIAL_ID_NEXT"
-    IA_SERIAL_ID_CURRENT="$HEX_VALUE_PREV"
-    CA_NEWCERT_CURRENT_PEM="$IA_NEWCERTS_ARCHIVE_DIR/${IA_SERIAL_ID_CURRENT}.pem"
-
-    echo "$(${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_CURRENT_PEM" |
-${OPENSSL_MD5}) $CA_NEWCERT_CURRENT_PEM"
-    echo "$(${OPENSSL_X509} -noout -modulus -in $IA_CERT_PEM | ${OPENSSL_MD5}) $IA_CERT_PEM"
-    echo "$(${OPENSSL_PKEY} -in "$IA_KEY_PEM" | ${OPENSSL_MD5}) $IA_KEY_PEM"
 
     echo "CA-NAME $IA_NAME verified"
 
@@ -1770,7 +1783,7 @@ while true; do
     -T|--traditional)
         OFSTD_LAYOUT="traditional"
         ;;
-    -v|--verbosity)
+    -v|--verbose)
         ((VERBOSITY=VERBOSITY+1))
         ;;
     --)
@@ -2080,6 +2093,6 @@ case "$CMD_MODE" in
     ;;
 esac
 
-echo "Successfully completed; exiting..." (RFC3161)
+echo "Successfully completed; exiting..."
 
 exit 0
