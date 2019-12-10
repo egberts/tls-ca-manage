@@ -10,6 +10,9 @@ If you have ANY of the following:
 * have custom CA directory layouts to maintain
 * Experiment with highest-encryption CA nodes.
 * On a power-trip to having your very own Root CA
+* Use 802.1AR to secure HW nodes on network
+* Experimenting with SmartCard and PKCS#15.
+* Work with PKCS#7, PKCS#8, PKCS#10, PKCS#12, PKCS#15.
 
 Fret no more, this tool may help you.  I did all the hard work and made it easy to support the following features:
 
@@ -17,9 +20,11 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
   - centralized or OpenSSL traditional
   - Nested CA or flat
 * Digest algorithms:
-  * SHA512, SHA384, SHA3-256, SHA3-224, SHA1, MD5
+  * SHA512, SHA384, SHA256, SHA3-256, SHA3-224, SHA1, MD5
 * Cipher algorithms
-  * ED25519, RSA, ECDSA, ChaCha20-Poly1305, AES
+  * aes128, aes256, aes-256-cbc, aes-128-cbc, des-ede3-cbc, camellia-256-cbc
+* Encryption algorithms
+  * RSA, ECDSA, ED25519, POLY1305 
 * Encryption bit size
   * 4096, 2048, 1024, 521, 512, 384, 256, 224, 192, 128
  * No root account required (enforces **`ssl-cert`** supplemental group)
