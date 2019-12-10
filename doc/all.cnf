@@ -66,6 +66,7 @@ serial = <filespec_rw>
 #  configuration file
 x509_extensions = <custom_v3_section_name>
 default_startdate = <'today'|YYMMDDHHMMSSZ>
+# default_enddate   = 99991231235959Z # per IEEE 802.1AR
 default_enddate = <YYMMDDHHMMSSZ>
 default_days = <base10_integer>
 crl = <filespec>
