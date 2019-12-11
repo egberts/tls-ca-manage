@@ -29,6 +29,33 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
   * 4096, 2048, 1024, 521, 512, 384, 256, 224, 192, 128
  * No root account required (enforces **`ssl-cert`** supplemental group)
 
+# Required Out-of-Band Setup:
+
+    sudo chown root:ssl-cert /etc/ssl
+    sudo chmod g+rxw,o-rwx /etc/ssl
+    sudo cp ./tls-ca-managed /usr/local/bin
+
+No install script purposely given here; this is serious admin effort here.  May impact other servers' improperly configured but direct access to `/etc/ssl`.
+
+My belief is that `/etc/ssl` was never intended for direct access by end-servers' TLS/SSL.  Just a holding area of certificates.
+
+I've tried to give 'ssl-cert' group access to end-server(s) but realized that would be giving away the TLS/SSL store too much.
+
+You create the appropriate 'private' subdirectory in each of the end-server's /etc/<server-name>/<private-tls> and COPY their server-specific certs over to there.
+
+# Example Setup
+The example setups are given in following sections:
+
+* Creating Root CA node
+* Creating Intermediate CA node
+* Creating 2nd Intermediate CA node
+* Renew Root CA node
+* Renew Intermediate CA node
+* Encrypt using ChaCha20-Poly1305
+* Encrypt using Elliptic Curve
+
+
+
 # Why Did I Make This?
 
 Bash!  Flexible!  Wrapping complex PKI trees using complex OpenSSL commands into a simple command line.
@@ -60,9 +87,9 @@ It is so bad that even EasyRSA has a problem staying current with the OpenSSL ve
 
 
 # Syntax
-So, to make it easy, the syntax is about the CA node itself.  A simple filename for a simple CA node.  
+So, to make it easy, the syntax is about the CA node itself;  A simple filename for a simple CA node.  
 
-Couple that with three basic commands:  Create, renew, and verify.
+Coupled that with three basic commands:  Create, renew, and verify.
 
 That's how simple it should be.
 ```
@@ -218,30 +245,7 @@ This command does not deal with distribution of certificates, just creation/rene
 
 Inspired by: https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
 
-# Components:
-* Public Key Infrastructure (PKI) - Security architecture where trust is conveyed through the signature of a trusted CA.
-* Certificate Authority (CA) - Entity issuing certificates and CRLs.
-* Registration Authority (RA) - Entity handling PKI enrollment. May be identical with the CA.
-* Certificate - Public key and ID bound by a CA signature.
-* Certificate Signing Request (CSR) - Request for certification. Contains public key and ID to be certified.
-* Certificate Revocation List (CRL) - List of revoked certificates. Issued by a CA at regular intervals.
-* Certification Practice Statement (CPS) - Document describing structure and processes of a CA.
 
-# CA Types:
-* Root CA - CA at the root of a PKI hierarchy. Issues only CA certificates.
-* Intermediate CA - CA below the root CA but not a signing CA. Issues only CA certificates.
-*  Signing CA - CA at the bottom of a PKI hierarchy. Issues only user certificates.
-
-# Certificate Types:
-
-* CA Certificate - Certificate of a CA. Used to sign certificates and CRLs.
-* Root Certificate - Self-signed CA certificate at the root of a PKI hierarchy. Serves as the PKI’s trust anchor.
-* Cross Certificate - CA certificate issued by a CA external to the primary PKI hierarchy. Used to connect two PKIs and thus usually comes in pairs.
-* User Certificate - End-user certificate issued for one or more purposes: email-protection, server-auth, client-auth, code-signing, etc. A user certificate cannot sign other certificates.
-
-# File Format:
-* Privacy Enhanced Mail (PEM) - Text format. Base-64 encoded data with header and footer lines. Preferred format in OpenSSL and most software based on it (e.g. Apache mod_ssl, stunnel).
-* Distinguished Encoding Rules (DER) - Binary format. Preferred format in Windows environments and certain high-end vendors. Also the official format for Internet download of certificates and CRLs.  (Not used here)
 
 # Commands
     tls-ca-managed.sh  - Creates/Renew/Verify all CA nodes (root or intermediate)
@@ -259,38 +263,7 @@ Example test runs:
     tls-ca-managed.sh -T  root                           # creates Root CA in traditional OpenSSL directory layout
 
 
-Required Out-of-Band Setup:
 
-    sudo chown root:ssl-cert /etc/ssl
-    sudo chmod g+rxw,o-rwx /etc/ssl
-    sudo cp ./tls-ca-managed /usr/local/bin
-
-No install script purposely given here; this is serious admin
-effort here.  May impact other servers' improperly configured
-but direct access to `/etc/ssl`.
-
-My belief is that `/etc/ssl` was never intended for direct access by
-end-servers' TLS/SSL.  Just a holding area of certificates.
-I've tried to give 'ssl-cert' group access to end-server(s) but realized
-that would be giving away the TLS/SSL store too much.
-You create the appropriate 'private' subdirectory in each of the
-end-server's /etc/<server-name>/<private-tls> and COPY their server-specific certs over to there.
-
-# Requirements
-
-* Active shell account be in 'ssl-cert' supplemental group
-* File write-access to /etc/ssl subdirectory (preferably at 'ssl-cert' group)
-* OpenSSL v1.1.1 or later (depends on 'openssl genpkey')
-
-# Example Setup
-The example setups are given in following sections:
-* Creating Root CA node
-* Creating Intermediate CA node
-* Creating 2nd Intermediate CA node
-* Renew Root CA node
-* Renew Intermediate CA node
-* Encrypt using ChaCha20-Poly1305
-* Encrypt using Elliptic Curve
 
 ## Creating Root CA node
 To create a root CA node, execute:
@@ -646,6 +619,34 @@ MD5(stdin)= e30fbb5ba0cecaad7a2d0cb836584c05
 MD5(stdin)= f7b2dc8f3be7464c6a73f0290b92dcfa /etc/ssl/ca/security-ca/private/security-ca.key
 Successfully completed; exiting...
 ```
+
+# Definitions
+## Components:
+
+* Public Key Infrastructure (PKI) - Security architecture where trust is conveyed through the signature of a trusted CA.
+* Certificate Authority (CA) - Entity issuing certificates and CRLs.
+* Registration Authority (RA) - Entity handling PKI enrollment. May be identical with the CA.
+* Certificate - Public key and ID bound by a CA signature.
+* Certificate Signing Request (CSR) - Request for certification. Contains public key and ID to be certified.
+* Certificate Revocation List (CRL) - List of revoked certificates. Issued by a CA at regular intervals.
+* Certification Practice Statement (CPS) - Document describing structure and processes of a CA.
+
+## CA Types:
+
+* Root CA - CA at the root of a PKI hierarchy. Issues only CA certificates.
+* Intermediate CA - CA below the root CA but not a signing CA. Issues only CA certificates.
+*  Signing CA - CA at the bottom of a PKI hierarchy. Issues only user certificates.
+
+## Certificate Types:
+
+* CA Certificate - Certificate of a CA. Used to sign certificates and CRLs.
+* Root Certificate - Self-signed CA certificate at the root of a PKI hierarchy. Serves as the PKI’s trust anchor.
+* Cross Certificate - CA certificate issued by a CA external to the primary PKI hierarchy. Used to connect two PKIs and thus usually comes in pairs.
+* User Certificate - End-user certificate issued for one or more purposes: email-protection, server-auth, client-auth, code-signing, etc. A user certificate cannot sign other certificates.
+
+# File Format:
+* Privacy Enhanced Mail (PEM) - Text format. Base-64 encoded data with header and footer lines. Preferred format in OpenSSL and most software based on it (e.g. Apache mod_ssl, stunnel).
+* Distinguished Encoding Rules (DER) - Binary format. Preferred format in Windows environments and certain high-end vendors. Also the official format for Internet download of certificates and CRLs.  (Not used here)
 
 # Additional information and alternatives
 
