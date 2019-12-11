@@ -31,7 +31,9 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
 
 # Why Did I Make This?
 
-Bash!  Flexible!  Wrapping complex OpenSSL commands to a simple function call.
+Bash!  Flexible!  Wrapping complex PKI trees using complex OpenSSL commands into a simple command line.
+
+![Expert PKI](https://pki-tutorial.readthedocs.io/en/latest/_images/ExpertPKILayout.png)
 
 There are OpenSSL encryption options that don't play well with other digest or bitsize settings.  It started out with parameter validation and explicitly telling you what options you can used with which (none of that man pages and connecting the dots there).
 
