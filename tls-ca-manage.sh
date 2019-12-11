@@ -844,6 +844,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
       # CNF_CA_EXT_AKI="keyid,issuer:always"  # used in 802.1ar iDevID
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+      # Need to remove 'clientAuth' from server extendedKeyUsage; no citation
+      # Need to remove 'nsSGC' from extendedKeyUsage, but no citation
+      # Need to remove 'msSGC' from extendedKeyUsage, but no citation
       CNF_CA_EXT_EKU="serverAuth,clientAuth"
       # CNF_CA_EXT_SAN="\$ENV::SAN"  # subjectAltName
       CNF_CA_EXT_SAN=""  # subjectAltName
@@ -853,6 +856,7 @@ function get_x509v3_extension_by_ca_type {
       ;;
     client)
       CNF_SECTION_REQ_EXT="section_client_ca_x509v3_extension"
+      # CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"  # very old
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
@@ -1632,6 +1636,16 @@ function cmd_verify_ca {
         echo "CSR $IA_CSR_PEM: FAILED VERIFICATION"
     else
         echo "CSR $IA_CSR_PEM: verified"
+    fi
+
+    # Verify the Certificate
+    openssl verify -no-CApath -no-CAstore \
+        -CAfile "$PARENT_IA_CERT_PEM" "$IA_CERT_PEM"
+    RETSTS=$?
+    if [[ $RETSTS -ne 0 ]]; then
+        echo "Certificate $IA_CERT_PEM: FAILED VERIFICATION"
+    else
+        echo "Certificate $IA_CERT_PEM: verified"
     fi
 
 
