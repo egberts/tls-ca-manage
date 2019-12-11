@@ -62,33 +62,197 @@ Couple that with three basic commands:  Create, renew, and verify.
 
 That's how simple it should be.
 ```
-tls-ca-manage.sh
-    [ --help|-h ]
-    [ --verbosity|-v ]
-    [ --topdir|-t <ssl-directory-path> ]  # (default: /etc/ssl)
-    [ --algorithm|-a [rsa|ed25519|ecdsa|poly1305|aes256|aes512] ]  # (default: rsa)
-    [ --message-digest|-m [sha512|sha384|sha256|sha224|sha1|md5] ]  # (default: sha256)
-    [ --keysize|-k [4096, 2048, 1024, 512, 256] ]  # (default: 4096)
-    [ --serial|-s <num> ]  # (default: 1000)
-    [ --group|-g <group-name> ]  # (default: ssl-cert)
-    [ -p | --parent-ca <parent-ca-name> ]  # (no default)
-    create | renew | revoke | help
-    <ca-name>
+Usage:  ./tls-ca-manage.sh
+        [ --help|-h ] [ --verbosity|-v ] [ --force-delete|-f ]
+        [ --base-dir|-b <ssl-directory-path> ]
+        [ --algorithm|-a [rsa|ed25519|ecdsa|poly1305] ]
+        [ --message-digest|-m [sha512|sha384|sha256|sha224|sha3-256|
+                               sha3-224|sha3-512|sha1|md5] ]
+        [ --keysize|-k [4096, 2048, 1024, 512, 256] ]
+        [ --serial|-s <num> ]  # (default: 1000)
+        [ --group|-g <group-name> ]  # (default: ssl-cert)
+        [ --openssl|-o <openssl-binary-filespec ]  # (default: /usr/local/bin/openssl)
+        [ --parent-ca|-p ] [-t|--ca-type <ca-type>] [ --traditional|-T ]
+        < create | renew | revoke | verify | help >
+        <ca-name>
+
+<ca-type>: standalone, root, intermediate, network, identity, component,
+           server, client, email, ocsp, timestamping, security, codesign
+Default settings:
+  Top-level SSL directory: /etc/ssl  Cipher: rsa
+  Digest: sha256 Keysize: 4096
+
 ```
+# Command Line Options
+A front-end tool to OpenSSL that enables creation, renewal, revocation, and verification of Certificate Authorities (CA).
+
+CA can be Root CA or Intermediate CA.
+
+Mandatory  arguments  to  long  options are mandatory for short options too.
+
+-a, --algorithm
+  Selects the cipher algorithm.
+  Valid algorithms are: rsa, ecdsa, poly1305 OR ed25519
+  These value are case-sensitive.
+  If no algorithm specified, then RSA is used by default.
+
+    -b, --base-dir
+        The top-level directory of SSL, typically /etc/ssl
+        Useful for testing this command in non-root shell
+        or maintaining SSL certs elsewhere (other than /etc/ssl).
+
+    -c, --cipher
+        Specify the encryption method of the PEM key file in
+        which to protect the key with.  Default is plaintext file.
+
+    -f, --force-delete
+        Forces deletion of its specified CA's configuration file
+        as pointed to by CA-NAME argument.
+
+    -g, --group
+        Use this Unix group name for all files created or updated.
+        Default is ssl-cert group.
+
+    -h, --help
+
+    -i, --intermediate-node
+        Makes this CA the intermediate node where additional CA(s)
+        can be branched from this CA.  Root CA is also an intermediate
+        node but top-level, self-signed intermediate node.
+
+        Not specifying --intermediate-node option means that this CA
+        cannot borne any additional CA branches and can only sign
+        other certificates.
+
+        Dictacts the presence of 'pathlen=0' in basicConstraints
+        during the CA Certificate Request stage.
+
+        Not specifying --parent-ca and not specifying --intermediate-node
+        means this certificate is a self-signed standalone
+        test certificate which cannot sign any other certificate.
+
+        If --intermediate-node and no --parent-ca, creates your Root CA.
+
+    -k, --key-size
+        Specifies the number of bits in the key.  The choice of key
+        size depends on the algorithm (-a) used.
+        The key size does not need to be specified if using a default
+        algorithm.  The default key size is 4096 bits.
+
+        Key size for ed25519 algorithm gets ignored here.
+        Valid poly1305 key sizes are:
+        Valid rsa key sizes are: 4096, 2048, 1024 or 512.
+        Valid ecdsa key sizes are: 521, 384, 256, 224 or 192.
+
+    -m, --message-digest
+ blake2b512        blake2s256        gost              md4
+ md5               rmd160            sha1              sha224
+ sha256            sha3-224          sha3-256          sha3-384
+ sha3-512          sha384            sha512            sha512-224
+ sha512-256        shake128          shake256          sm3
+
+    -n, --nested-ca
+        First chaining of first-level CAs are placed in subdirectory inside
+        its Root CA directory, and subsequent chaining of second-level CA
+        get nesting also in subdirectory inside its respective Intermediate
+        CA directory.  Very few organizations use this.
+
+    -p, --parent-ca
+        Specifies the Parent CA name.  It may often be the Root CA name
+        or sometimes the Intermediate CA name.  The Parent CA name is
+        the same CA-NAME used when creating the parent CA.
+
+    -r, --reason
+        Specifies the reason for the revocation.
+        The value can be one of the following: unspecified,
+        keyCompromise, CACompromise, affiliationChanged,
+        superseded, cessationOfOperation, certificateHold,
+        and removeFromCRL. (from RFC5280)
+        Used only with 'revoke' command
+
+    -s, --serial
+        Specifies the starting serial ID number to use in the certificate.
+        The default serial ID is 1000 HEXI-decimal.  Format of number are
+        stored and handled in hexidecimal format of even number length.
+
+    -t, --ca-type
+        Specifies the type of CA node that this is going to be:
+
+          root         - Top-most Root node of CA tree
+          intermediate - Middle node of CA tree
+          security     - Signing CA for security plant
+          component    - Generic signing CA for network
+          network      - Generic signing CA for network
+        End-nodes are:
+          standalone   - self-signed test certificate
+          server       - TLS server: Web server, MTA, VPN, IMAP, POP3, 802.1ar
+          client       - TLS client:
+          ocsp         - OCSP
+          email        - Encryption part of SMTP body
+          identity     - Signing CA for Microsoft SmartCard identity
+          encryption   - Microsoft Encrypted File System (msEFS)
+          codesign     - Signed executable code
+          timestamping - ANSI X9.95 TimeStamping (RFC3161)
+
+    -T, --traditional
+        Indicates the standard OpenSSL directory layout.
+        Default is to use the new centralized directory layout.
+
+    -v, --verbosity
+        Sets the debugging level.
+
+Makes one assumption: that the openssl.cnf is ALWAYS the filename (never tweaked)
+Just that different directory has different openssl.cnf
+
+Enforces 'ssl-cert' group; and requires all admins to have 'ssl-cert'  group when using this command
+
+DO NOT be giving 'ssl-cert' group to server daemons' supplemental group ID (or worse, as its group ID); for that, you copy the certs over to app-specific directory and use THAT app's file permissions.
+
+This command does not deal with distribution of certificates, just creation/renewal/revokation of therein.
+
+'ssl-cert' group means 'working with SSL/TLS certificates, not just reading certs'.
+
+Inspired by: https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
+
+# Components:
+* Public Key Infrastructure (PKI) - Security architecture where trust is conveyed through the signature of a trusted CA.
+* Certificate Authority (CA) - Entity issuing certificates and CRLs.
+* Registration Authority (RA) - Entity handling PKI enrollment. May be identical with the CA.
+* Certificate - Public key and ID bound by a CA signature.
+* Certificate Signing Request (CSR) - Request for certification. Contains public key and ID to be certified.
+* Certificate Revocation List (CRL) - List of revoked certificates. Issued by a CA at regular intervals.
+* Certification Practice Statement (CPS) - Document describing structure and processes of a CA.
+
+# CA Types:
+* Root CA - CA at the root of a PKI hierarchy. Issues only CA certificates.
+* Intermediate CA - CA below the root CA but not a signing CA. Issues only CA certificates.
+*  Signing CA - CA at the bottom of a PKI hierarchy. Issues only user certificates.
+
+# Certificate Types:
+
+* CA Certificate - Certificate of a CA. Used to sign certificates and CRLs.
+* Root Certificate - Self-signed CA certificate at the root of a PKI hierarchy. Serves as the PKI’s trust anchor.
+* Cross Certificate - CA certificate issued by a CA external to the primary PKI hierarchy. Used to connect two PKIs and thus usually comes in pairs.
+* User Certificate - End-user certificate issued for one or more purposes: email-protection, server-auth, client-auth, code-signing, etc. A user certificate cannot sign other certificates.
+
+# File Format:
+* Privacy Enhanced Mail (PEM) - Text format. Base-64 encoded data with header and footer lines. Preferred format in OpenSSL and most software based on it (e.g. Apache mod_ssl, stunnel).
+* Distinguished Encoding Rules (DER) - Binary format. Preferred format in Windows environments and certain high-end vendors. Also the official format for Internet download of certificates and CRLs.  (Not used here)
+
 # Commands
     tls-ca-managed.sh  - Creates/Renew/Verify all CA nodes (root or intermediate)
     tls-create-server.sh - Adds all the end-CAs (TLS servers, ...)
 
 Example test runs:
 
-    tls-ca-managed.sh create root              # creates the Root CA under /etc/ssl
-    tls-ca-managed.sh verify root              # Verifies Root CA certificates
-    tls-ca-managed.sh -p root create network   # creates Network Intermediate CA
-    tls-ca-managed.sh -p root verify network   # Verifies Network CA certificates
-    tls-ca-managed.sh -p root create identity  # creates Identity Intermediate CA
-    tls-ca-managed.sh -p root create security  # creates Security Intermediate CA
-    tls-ca-managed.sh -b /tmp/etc/ssl root     # creates Root CA under /tmp/etc/ssl
-    tls-ca-managed.sh -t root                  # creates Root CA in traditional
+    tls-ca-managed.sh create -t root root                # creates the Root CA under /etc/ssl
+    tls-ca-managed.sh verify root                        # Verifies Root CA certificates
+    tls-ca-managed.sh create -p root -t server network   # creates Network Intermediate CA
+    tls-ca-managed.sh verify network                     # Verifies Network CA certificates
+    tls-ca-managed.sh create -p root -t identity company_id  # creates Identity Intermediate CA
+    tls-ca-managed.sh create -p root -t security ActiveCardKeysCA  # creates Security Intermediate CA
+    tls-ca-managed.sh create -b /tmp/etc/ssl root        # creates Root CA under /tmp/etc/ssl
+    tls-ca-managed.sh -T  root                           # creates Root CA in traditional OpenSSL directory layout
 
 
 Required Out-of-Band Setup:
