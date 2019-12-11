@@ -3,7 +3,7 @@ Certificate Authority Management tool, written in bash shell.
 
 If you have ANY of the following:
 
-* befuddle by myriad of OpenSSL CLI options, particularly ecryption
+* befuddle by myriad of OpenSSL CLI options, particularly encryption
 * a white lab or clean room
 * many CA nodes needed
 * have a private TLD domain name and infrastructure
