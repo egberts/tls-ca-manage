@@ -37,6 +37,8 @@ Bash!  Flexible!  Wrapping complex PKI trees using complex OpenSSL commands into
 
 There are OpenSSL encryption options that don't play well with other digest or bitsize settings.  It started out with parameter validation and explicitly telling you what options you can used with which (none of that man pages and connecting the dots there).
 
+Wait, there's more.
+
 ## Nested CA 
 File organization for nested CAs also come in two flavors:
 * flat
