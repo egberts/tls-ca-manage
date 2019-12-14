@@ -81,3 +81,18 @@ default_crl_hours = <base10_integer>
 #   _max
 #   _default
 #   _value
+#
+[ca_custom_x509_extension]
+authorityInfoAccess = caIssuers
+authorityInfoAccess = OCSP
+authorityInfoAccess = DNS:example.com
+authorityInfoAccess = IP:127.0.0.1
+authorityInfoAccess = OCSP
+authorityInfoAccess = URI:http://127.0.0.1:8080
+authorityInfoAccess = email:johndoe@example.com
+authorityInfoAccess = caIssuers;OCSP;URI:http://127.0.0.1:8080
+
+[crl_custom_x509_extension]
+fullname=URI:http://myhost.com/myca.crl
+CRLissuer=dirName:issuer_sect
+reasons=keyCompromise, CACompromise
