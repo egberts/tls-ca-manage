@@ -218,14 +218,15 @@ DEFAULT_INTCA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
 
 
 function input_data {
-  PROMPT="$1"
-  DEFAULT_VALUE="$2"
-  echo -n "$PROMPT (default: '$DEFAULT_VALUE'): "
-  read -r INPUT_DATA
-  if [[ -z "$INPUT_DATA" ]]; then
-    INPUT_DATA="$DEFAULT_VALUE"
+  ID_PROMPT="$1"
+  ID_DEFAULT_VALUE="$2"
+  echo -n "$ID_PROMPT (default: '$ID_DEFAULT_VALUE'): "
+  read -r ID_INPUT_DATA
+  if [[ -z "$ID_INPUT_DATA" ]]; then
+    ID_INPUT_DATA="$ID_DEFAULT_VALUE"
   fi
-  return
+  unset ID_PROMPT
+  unset ID_DEFAULT_VALUE
 }
 
 function directory_file_layout {
@@ -494,7 +495,7 @@ function directory_file_layout {
     CERT_CHAIN_PEM="$CERT_CHAIN_DIR/$CERT_CHAIN_FNAME"
 
     PARENT_IA_CERT_PEM="$PARENT_IA_CERTS_DIR/$PARENT_IA_CERT_FNAME"
-    PARENT_IA_KEY_PEM="$PARENT_IA_KEY_DIR/$PARENT_IA_KEY_FNAME${XXX_SERIAL_ID}"
+    PARENT_IA_KEY_PEM="$PARENT_IA_KEY_DIR/$PARENT_IA_KEY_FNAME"
     PARENT_IA_INDEX_DB="$PARENT_IA_INDEX_DB_DIR/$PARENT_IA_INDEX_FNAME"
     PARENT_IA_SERIAL_DB="$PARENT_IA_SERIAL_DB_DIR/$PARENT_IA_SERIAL_FNAME"
     PARENT_IA_CRL_DB="$PARENT_IA_CRL_DB_DIR/$PARENT_IA_CRLNUMBER_FNAME"
@@ -546,7 +547,7 @@ function touch_cert_file {
         echo "(and untouchable); aborting..."
         exit 1
     fi
-    [[ $VERBOSITY -gt 0 ]] && echo "touch $1"
+    [[ ${VERBOSITY} -gt 0 ]] && echo "touch $1"
     touch "$1"
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$1"
 }
@@ -554,7 +555,7 @@ function touch_cert_file {
 function delete_file {
     DELETE_FILE="${1:-/tmp/nope}"  # emergency undefined $1 protection
     if [[ -f "$DELETE_FILE" ]]; then
-        [[ $VERBOSITY -gt 0 ]] && echo "rm $DELETE_FILE"
+        [[ ${VERBOSITY} -gt 0 ]] && echo "rm $DELETE_FILE"
         rm "$DELETE_FILE"
     fi
 }
@@ -572,31 +573,31 @@ function delete_cert_dirfiles {
     delete_file "$CERT_CERT_PEM"
     delete_file "$CERT_CRL_PEM"
     delete_file "$CERT_CHAIN_PEM"
-    if [[ $FORCE_DELETE_CONFIG -eq 1 ]]; then
+    if [[ ${FORCE_DELETE_CONFIG} -eq 1 ]]; then
         delete_cert_config
     fi
 }
 
 function data_entry_generic {
-    INPUT_DATA=
+    ID_INPUT_DATA=""
     input_data "Organization" "$X509_ORG"
-    X509_ORG="$INPUT_DATA"
+    X509_ORG="$ID_INPUT_DATA"
     input_data "Org. Unit/Section/Division: " "$X509_OU"
-    X509_OU="$INPUT_DATA"
+    X509_OU="$ID_INPUT_DATA"
     input_data "Common Name: " "$X509_COMMON"
-    X509_COMMON="$INPUT_DATA"
+    X509_COMMON="$ID_INPUT_DATA"
     input_data "Country (2-char max.): " "$X509_COUNTRY"
-    X509_COUNTRY="$INPUT_DATA"
+    X509_COUNTRY="$ID_INPUT_DATA"
     input_data "State: " "$X509_STATE"
-    X509_STATE="$INPUT_DATA"
+    X509_STATE="$ID_INPUT_DATA"
     input_data "Locality/City: " "$X509_LOCALITY"
-    X509_LOCALITY="$INPUT_DATA"
+    X509_LOCALITY="$ID_INPUT_DATA"
     input_data "Contact email: " "$X509_EMAIL"
-    X509_EMAIL="$INPUT_DATA"
+    X509_EMAIL="$ID_INPUT_DATA"
     input_data "Base URL: " "$X509_URL_BASE"
-    X509_URL="$INPUT_DATA"
+    X509_URL="$ID_INPUT_DATA"
     input_data "CRL URL: " "$X509_CRL"
-    X509_CRL="$INPUT_DATA"
+    X509_CRL="$ID_INPUT_DATA"
 }
 
 
@@ -605,8 +606,8 @@ function data_entry_generic {
 function get_x509v3_extension_by_cert_type {
   GXEBCT_CA_TYPE=$1
   GXEBCT_PATHLEN_COUNT=$2
-  [[ -n $GXEBCT_PATHLEN_COUNT ]] || GXEBCT_PATHLEN_COUNT=-1
-  if [[ $GXEBCT_PATHLEN_COUNT -ge 0 ]]; then
+  [[ -n ${GXEBCT_PATHLEN_COUNT} ]] || GXEBCT_PATHLEN_COUNT=-1
+  if [[ ${GXEBCT_PATHLEN_COUNT} -ge 0 ]]; then
     GXEBCT_PATHLEN_OPTION=",pathlen:$GXEBCT_PATHLEN_COUNT"
   else
     GXEBCT_PATHLEN_OPTION=""
@@ -628,6 +629,16 @@ function get_x509v3_extension_by_cert_type {
       # CNF_REQ_EXT_AIA="@ocsp_info"
       # CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_AIA=""
+      CNF_SECTION_CA_EXT="section_server_ca_x509v3_extension"
+      CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
+      CNF_CA_EXT_BC="CA:false"
+      CNF_CA_EXT_SKI="hash"
+      CNF_CA_EXT_AKI="keyid:always"
+      CNF_CA_EXT_AIA="@ocsp_info"
+      CNF_CA_EXT_EKU="serverAuth"  # No 'clientAuth' allowed
+      # Only need serverAuth & clientAuth together if
+      #   making a PEM key that combines private and public key (bad idea)
+      CNF_CA_EXT_SAN=""
       ;;
     client)
       CNF_SECTION_REQ_EXT="section_client_req_x509v3_extension"
@@ -690,8 +701,9 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_BC="CA:false"  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+      # msSmartcardLogin is implementation-dependent, but include here nonetheless
       CNF_REQ_EXT_EKU="emailProtection,clientAuth,msSmartcardLogin"
-      CNF_REQ_EXT_SAN=""  # subjectAltName
+      CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
       ;;
     codesign)
@@ -714,34 +726,93 @@ function get_x509v3_extension_by_cert_type {
 
 function write_line_or_no
 {
-    KEY_NAME=$1
-    VALUE_NAME=$2
-    if [[ -n "$VALUE_NAME" ]]; then
-        echo "$KEY_NAME = $VALUE_NAME" >> "$INTERNODE_CONFIG_FILESPEC"
+    WLON_KEY_NAME=$1
+    WLON_VALUE_NAME=$2
+    WLON_INTERNODE_CONFIG_FILESPEC=$3
+    if [[ -n "$WLON_VALUE_NAME" ]]; then
+        echo "$WLON_KEY_NAME = $WLON_VALUE_NAME" >> "$WLON_INTERNODE_CONFIG_FILESPEC"
     fi
+    unset WLON_KEY_NAME
+    unset WLON_VALUE_NAME
+    unset WLON_INTERNODE_CONFIG_FILESPEC
 }
 
 # Creates an extension file that details the
 # relatioship between parent CA and its child CA
 #
-# Usage: create_internode_config <section_name> \
-#                                <internode_filespec> \
-#                                <parent_node_name>
-function create_internode_config
+function create_generic_ca_extension_config_file
 {
-    SECTION_NAME=$1
-    INTERNODE_CONFIG_FILESPEC=$2
-    PARENT_CONFIG_FILESPEC=$3
-    CURRENT_TIMESTAMP=$(date)
-    echo """#
-# File: $INTERNODE_CONFIG_FILESPEC
-# Created: $CURRENT_TIMESTAMP
-# Used with: $PARENT_CONFIG_FILESPEC
+  CCEC_SECTION_NAME="$1"
+  CCEC_EXTFILE="$2"
+  CCEC_CURRENT_TIMESTAMP=$(date)
+  echo """#
+# File: $CCEC_EXTFILE
+# Created on: $CCEC_CURRENT_TIMESTAMP
 # Generated by: $0
 #
 # Description:
-#    This file is used by the 'openssl req' command. 
-#    Since we cannot know the DN in advance, the user 
+#    Generic CA certificate extension configuration file.
+#
+#    This file makes it possible to extend functionality of
+#    the parent Signing CA to supporting different types of certificates
+#
+#    This file is used by the 'openssl ca' command.
+#
+#    An OpenSSL extension configuration file that contains
+#    key-value pair that characterize the relationship between
+#    the parent CA and itself.
+#
+# Usage:
+#    openssl ca -config $PARENT_IA_OPENSSL_CNF_CA_FILE \\
+#               -extfile $CCEC_EXTFILE \\
+#               -extfension $CCEC_SECTION_NAME \\
+#               ...
+#
+# Section Name breakdown:
+#    ca: section name '[ ca ]'; used by 'openssl ca'
+#    x509_extensions: Key name (to a key-value statement)
+#    ${PARENT_IA_NAME}: Parent CA's config file
+#    ${CERT_NAME}:    this node
+#
+# Section name could be a simple ${CA_TYPE} name
+# But having CA_TYPE-CA_NAME makes it possible to support
+# different class of the same CA-TYPE by using CA_NAMe as a unique label
+[ $CCEC_SECTION_NAME ]
+""" > "$CCEC_EXTFILE"
+    write_line_or_no "keyUsage"               "$CNF_CA_EXT_KU" "$CCEC_EXTFILE"
+    write_line_or_no "basicConstraints"       "$CNF_CA_EXT_BC" "$CCEC_EXTFILE"
+    write_line_or_no "subjectKeyIdentifier"   "$CNF_CA_EXT_SKI" "$CCEC_EXTFILE"
+    write_line_or_no "authorityKeyIdentifier" "$CNF_CA_EXT_AKI" "$CCEC_EXTFILE"
+    write_line_or_no "extendedKeyUsage"       "$CNF_CA_EXT_EKU" "$CCEC_EXTFILE"
+    write_line_or_no "subjectAltName"         "$CNF_CA_EXT_SAN" "$CCEC_EXTFILE"
+    write_line_or_no "authorityInfoAccess"    "$CNF_CA_EXT_AIA" "$CCEC_EXTFILE"
+    write_line_or_no "crlDistributionPoint"   "" "$CCEC_EXTFILE"
+    echo "$CNF_CA_EXT_EXTRA" >> "$CCEC_EXTFILE"
+    unset CCEC_SECTION_NAME
+    unset CCEC_EXTFILE
+    unset CCEC_TIMESTAMP
+}
+
+# Usage: create_cert_config
+#                                <section_name> \
+#                                <internode_filespec>
+function create_generic_cert_req_config_file
+{
+  CGCRCF_SECTION_NAME=$1
+  CGCRCF_CNFFILE=$2
+  CGCRCF_CURRENT_TIMESTAMP=$(date)
+  echo """#
+# File: $CGCRCF_CNFFILE
+# Created on: $CGCRCF_CURRENT_TIMESTAMP
+# Generated by: $0
+#
+# Description:
+#    Create generic Certificate Request main configuration file.
+#
+#    This file is used by the 'openssl req' command as main\
+#    configuration file to create a end-user certificate.
+#
+#    Since we cannot know the DN in advance, the user
 #    must be prompted for DN information.
 #
 #    An OpenSSL extension configuration file that contains
@@ -749,7 +820,91 @@ function create_internode_config
 #    the parent CA and itself.
 #
 # Usage:
-#    openssl req -config $PARENT_CONFIG_FILESPEC \\
+#    openssl req -config $CGCRCF_CNFFILE \\
+#                -extfile $CERT_OPENSSL_CNF_REQ_EXTFILE \\
+#                ...
+#
+# Section Name breakdown:
+#    req: section name '[ req ]'; used by 'openssl req'
+#    x509_extensions: Key name (to a key-value statement)
+#    ${PARENT_IA_NAME}: Parent CA's config file
+#    ${CERT_NAME}:    this node
+#
+[ req ]
+default_bits            = $KEYSIZE_BITS         # RSA key size
+encrypt_key             = yes                   # Protect private key
+default_md              = $MESSAGE_DIGEST       # MD to use
+utf8                    = yes                   # Input is UTF-8
+string_mask             = utf8only              # Emit UTF-8 strings
+prompt                  = yes                   # Prompt for DN
+distinguished_name      = ${CA_TYPE}_dn         # DN template
+req_extensions          = $CGCRCF_SECTION_NAME     # Desired extensions
+
+[ ${CA_TYPE}_dn ]
+countryName               = Country Name (2-letter code)
+countryName_default       = US
+countryName_min           = 2
+countryName_max           = 2
+
+stateOrProvinceName             = State or Province Name (full name)
+stateOrProvinceName_default     = Some-State
+
+localityName                    = Locality Name (eg, city)
+
+0.organizationName              = \"Organization Name (eg, company)\"
+0.organizationName_default      = \"ACME Network\"
+# we can do this but it is not needed normally :-)
+#1.organizationName             = Second Organization Name (eg, company)
+#1.organizationName_default     = World Wide Web Pty Ltd
+
+organizationalUnitName          = Organizational Unit Name (eg, section)
+organizationalUnitName_default = \"ACME Intermediate CA B2\"
+
+commonName                      = Common Name (e.g. server FQDN or YOUR name)
+commonName_default              = \"John Doe\"
+commonName_max                  = 64
+
+emailAddress                    = Email Address
+emailAddress_default            = \"jdoe@example.invalid\"
+emailAddress_max                = 64
+
+# domainComponent is not used by 'identity.conf'
+0.domainComponent               = \"Top-level Domain Name (i.e., com, net, org)\"
+0.domainComponent_default       = \"invalid\"
+1.domainComponent               = \"The Domain Name (i.e., example, test, acme)\"\
+1.domainComponent_default       = \"example\"
+2.domainComponent               = \"Sub-Domain Name (i.e., www, ocsp, or 'blank')\"\
+2.domainComponent_default       = \"\"
+
+""" > "$CGCRCF_CNFFILE"  # create file, appends later on
+
+  unset CIC_SECTION_NAME
+  unset CIC_CONFIG_FILESPEC
+  unset CIC_TIMESTAMP
+}
+
+# Usage: create_generic_ca_extension_config_file \
+#                                <section_name> \
+#                                <internode_filespec>
+function create_generic_cert_req_extension_config_file
+{
+  CGCCF_SECTION_NAME=$2
+  CGCCF_CONFIG_FILESPEC=$3
+  CGCCF_CURRENT_TIMESTAMP=$(date)
+  echo """#
+# File: $CGCCF_CONFIG_FILESPEC
+# Created: $CGCCF_CURRENT_TIMESTAMP
+# Generated by: $0
+#
+# Description:
+#    Create generic certificate request extension-only configuration file\
+#
+#    This file is used by the 'openssl req' command as an extension config file.
+#
+# Usage:
+#    openssl req -config $PARENT_IA_OPENSSL_CNF_CA_FILE \\
+#               -extfile $CGCCF_CONFIG_FILESPEC \\
+#               -extension $CGCCF_SECTION_NAME \\
 #        ...
 #
 # Section Name breakdown:
@@ -758,51 +913,21 @@ function create_internode_config
 #    ${PARENT_IA_NAME}_ca: Parent CA's config file
 #    ${CERT_NAME}:    this node
 #
-[ req ]
-default_bits            = $KEYSIZE_BITS          # RSA key size
-encrypt_key             = yes                   # Protect private key
-default_md              = $MESSAGE_DIGEST       # MD to use
-utf8                    = yes                   # Input is UTF-8
-string_mask             = utf8only              # Emit UTF-8 strings
-prompt                  = yes                   # Prompt for DN
-distinguished_name      = this_dn               # DN template
-req_extensions          = $SECTION_NAME         # Desired extensions
+[ $CGCCF_SECTION_NAME ]
+""" > "$CGCCF_CONFIG_FILESPEC"  # create file, appends later on
+    write_line_or_no "keyUsage"               "$CNF_REQ_EXT_KU" "$CGCCF_CONFIG_FILESPEC"
+    write_line_or_no "basicConstraints"       "$CNF_REQ_EXT_BC" "$CGCCF_CONFIG_FILESPEC"
+    write_line_or_no "subjectKeyIdentifier"   "$CNF_REQ_EXT_SKI" "$CGCCF_CONFIG_FILESPEC"
+    write_line_or_no "authorityKeyIdentifier" "$CNF_REQ_EXT_AKI" "$CGCCF_CONFIG_FILESPEC"
+    write_line_or_no "extendedKeyUsage"       "$CNF_REQ_EXT_EKU" "$CGCCF_CONFIG_FILESPEC"
+    write_line_or_no "subjectAltName"         "$CNF_REQ_EXT_SAN" "$CGCCF_CONFIG_FILESPEC"
+    write_line_or_no "authorityInfoAccess"    "$CNF_REQ_EXT_AIA" "$CGCCF_CONFIG_FILESPEC"
+    write_line_or_no "crlDistributionPoint"   "" "$CGCCF_CONFIG_FILESPEC"
+    echo "$CNF_CA_EXT_EXTRA" >> "$CGCCF_CONFIG_FILESPEC"
 
-[ this_dn ]
-0.domainComponent_default = \"invalid\"
-1.domainComponent_default = \"example\"
-2.domainComponent_default = \"\"
-organizationName_default = \"ACME Network\"
-organizationUnitName_default = \"ACME Intermediate CA B2\"
-commonName_default        = \"John Doe\"
-emailAddress_default      = \"jdoe@example.invalid\"
-
-0.domainComponent       = \"TLD part of email address\"
-1.domainComponent       = \"domain name part of email\"
-2.domainComponent       = \"subdomain name (period if blank)\"
-organizationName        = \"Organization Name\"
-organizationalUnitName  = \"Organization Unit\"
-commonName              = \"Full Name\"
-commonName_max          = 64
-emailAddress            = \"Email address\"
-emailAddress_max        = 40
-
-[ $SECTION_NAME ]
-""" > "$INTERNODE_CONFIG_FILESPEC"  # create file, appends later on
-    write_line_or_no "keyUsage"               "$CNF_REQ_EXT_KU"
-    write_line_or_no "basicConstraints"       "$CNF_REQ_EXT_BC"
-    write_line_or_no "subjectKeyIdentifier"   "$CNF_REQ_EXT_SKI"
-    write_line_or_no "authorityKeyIdentifier" "$CNF_REQ_EXT_AKI"
-    write_line_or_no "extendedKeyUsage"       "$CNF_REQ_EXT_EKU"
-    write_line_or_no "subjectAltName"         "$CNF_REQ_EXT_SAN"
-    write_line_or_no "authorityInfoAccess"    "$CNF_REQ_EXT_AIA"
-    write_line_or_no "crlDistributionPoint"   ""
-    echo "$CNF_CA_EXT_EXTRA" >> "$INTERNODE_CONFIG_FILESPEC"
-
-    unset SECTION_NAME
-    unset INTERNODE_CONFIG_FILESPEC
-    unset PARENT_CONFIG_FILESPEC
-    unset TIMESTAMP
+    unset CGCCF_CONFIG_FILESPEC
+    unset CGCCF_SECTION_NAME
+    unset CGCCF_TIMESTAMP
 }
 
 
@@ -851,12 +976,11 @@ function cert_create_public_key
 function cert_create_csr 
 {
     CCC_SECTION_NAME=$1
-    CCC_INTERNODE_CONFIG_FILESPEC=$2
-    CCC_PARENT_CONFIG_FILESPEC=$3
+    CCC_CERT_CONFIG_FILESPEC=$2
 
-    ${OPENSSL} req -config "${CCC_INTERNODE_CONFIG_FILESPEC}" \
+    ${OPENSSL} req -config "${CCC_CERT_CONFIG_FILESPEC}" \
         -new \
-        -key "$CERT_KEY_PEM" \
+        -keyout "$CERT_KEY_PEM" \
         "$MESSAGE_DIGEST_CMDOPT" \
         -out "$CERT_CSR_PEM"
     RETSTS=$?
@@ -884,14 +1008,14 @@ function cert_create_csr
 # Parent CA accept CA node's CSR by trusting  #
 ###############################################
 function cert_create_certificate {
-    echo "Creating $CERT_CA_TYPE certificate ..."
-    CCC_CERT_OPENSSL_CNF_EXTFILE="$1"
-    CCC_CERT_OPENSSL_CNF_EXTENSION="$2"
+    echo "Creating '$CERT_CA_TYPE'-type certificate ..."
+    CCC_CERT_OPENSSL_CNF_EXTENSION="$1"
+    CCC_CERT_OPENSSL_CNF_EXTFILE="$2"
     ${OPENSSL_CA} \
         -batch \
         ${IA_OPENSSL_CA_OPT} \
-        -extfile "${CCC_CERT_OPENSSL_CNF_EXTFILE}" \
-        -extensions "${CCC_CERT_OPENSSL_CNF_EXTENSION}" \
+        -extfile "$CCC_CERT_OPENSSL_CNF_EXTFILE" \
+        -extensions "$CCC_CERT_OPENSSL_CNF_EXTENSION" \
         -in "$CERT_CSR_PEM" \
         -days 3650 \
         -md "$MESSAGE_DIGEST" \
@@ -913,7 +1037,7 @@ function cert_create_revocation_list
     echo "Creating $CERT_CA_TYPE certificate revocation list (CRL)..."
     ${OPENSSL_CA} \
         -gencrl \
-        -config "$IA_OPENSSL_CNF" \
+        -config "$PARENT_IA_OPENSSL_CNF_CA_FILE" \
         -out "$CERT_CRL_PEM"
 }
 
@@ -950,7 +1074,7 @@ function ca_renew_certificate
 {
     CRC_CERT_OPENSSL_CNF_EXTFILE="$1"
     CRC_CERT_OPENSSL_CNF_EXTENSION="$2"
-    # DO NOT USE 'openssl x509', because lack of DB accounting
+    # DO NOT USE 'openssl x509', because it lacks DB accounting
     ${OPENSSL_CA} \
         -verbose \
         ${IA_OPENSSL_CA_OPT} \
@@ -990,7 +1114,7 @@ function display_cert_certificate {
     echo "Displaying MD5 of various CA certificates:"
     echo "$(${OPENSSL_X509} -noout -modulus -in "$DCC_THIS_PEM" | ${OPENSSL_MD5}) $DCC_THIS_PEM"
 
-    if [[ "$VERBOSITY" -ne 0 ]]; then
+    if [[ ${VERBOSITY} -ne 0 ]]; then
         echo "Decoding $CERT_CA_TYPE certificate:"
         ${OPENSSL_X509} -in "$DCC_THIS_PEM" -noout -text
     else
@@ -1014,7 +1138,7 @@ function delete_any_old_cert_files {
         echo "WHOA! Directory $CERT_CERTS_DIR does not exist."
         exit 1
     fi
-    [[ $FORCE_DELETE_CONFIG -eq 1 ]] && delete_cert_config
+    [[ ${FORCE_DELETE_CONFIG} -eq 1 ]] && delete_cert_config
 }
 
 
@@ -1040,31 +1164,27 @@ function cmd_create_cert {
     # Capture data entry for distinguished name
     if [[ ! -f "$CERT_OPENSSL_CNF_REQ_FILE" ]]; then
 
-        # Clone from default /etc/ssl/openssl.cnf
+        # Create a new OpenSSL
         echo "$CERT_OPENSSL_CNF_REQ_FILE file is missing, recreating ..."
         data_entry_generic
     fi
 
-    [[ "$VERBOSITY" -ne 0 ]] && echo "Creating $CERT_CA_TYPE private key ..."
+    [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $CERT_CA_TYPE private key ..."
 
     echo "DEBUG: DEBUG: CA_TYPE: $CA_TYPE"
-    get_x509v3_extension_by_cert_type $CA_TYPE -1
-
-    echo "DEBUG: DEBUG: THIS_SECTION: $THIS_SECTION"
-    echo "DEBUG: DEBUG: CERT_OPENSSL_CNF_REQ_FILE: $CERT_OPENSSL_CNF_REQ_FILE"
-    echo "DEBUG: DEBUG: CERT_OPENSSL_CNF_REQ_EXTFILE: $CERT_OPENSSL_CNF_REQ_EXTFILE"
-    create_internode_config "$THIS_SECTION" \
-                            "$CERT_OPENSSL_CNF_REQ_EXTFILE" \
-                            "$CERT_OPENSSL_CNF_REQ_FILE"
+    get_x509v3_extension_by_cert_type "$CA_TYPE" -1
 
     cert_create_public_key
 
-    # Create PKCS#10 (Certificate Signing Request)
-    cert_create_csr "$THIS_SECTION" \
-                            "$CERT_OPENSSL_CNF_REQ_EXTFILE" \
-                            "$CERT_OPENSSL_CNF_REQ_FILE"
+    create_generic_cert_req_config_file "$THIS_SECTION" "$CERT_OPENSSL_CNF_REQ_FILE"
 
-    cert_create_certificate "$IA_EXT_FNAME" "$THIS_SECTION"
+    # Create PKCS#10 (Certificate Signing Request)
+    cert_create_csr "$THIS_SECTION" "$CERT_OPENSSL_CNF_REQ_FILE"
+
+    SECTION_CA="$PARENT_IA_NAME-${CA_TYPE}"
+    create_generic_ca_extension_config_file "$SECTION_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
+
+    cert_create_certificate "$SECTION_CA" "$PARENT_IA_OPENSSL_CNF_CA_EXTFILE"
 
     cert_create_revocation_list
 
@@ -1088,7 +1208,7 @@ function cmd_create_cert {
     echo "  $CERT_CA_TYPE cert req   : $CERT_CSR_PEM"
     echo "  $CERT_CA_TYPE certificate: $CERT_CERT_PEM"
     echo "  $CERT_CA_TYPE private key: $CERT_KEY_PEM"
-    echo "  $CERT_CA_TYPE new cert   : $PARENT_IA_NEWCERT_NEW_PEM"
+    echo "  $CERT_CA_TYPE new cert   : $PARENT_IA_NEWCERTS_ARCHIVE_DIR"
     echo "  $CERT_CA_TYPE CRL        : $CERT_CRL_PEM"
 }
 
@@ -1124,7 +1244,7 @@ function cmd_renew_cert {
             exit 2
         fi
     fi
-    [[ ${VERBOSITY} -ne 0 ]] && echo "CA subdirectory:  $(ls -1lad ${CERT_CERTS_DIR}/)"
+    [[ ${VERBOSITY} -ne 0 ]] && echo "CA subdirectory:  $(ls -1lad "${CERT_CERTS_DIR}/")"
 
     for THIS_DIR in ${CERT_CERTS_DIR} ${CERT_KEY_DIR} ${CERT_NEWCERTS_ARCHIVE_DIR} ${CERT_CRL_DIR}; do
       if [[ ! -e "$THIS_DIR" ]]; then
@@ -1145,14 +1265,9 @@ function cmd_renew_cert {
     get_x509v3_extension_by_cert_type "$CA_TYPE" -1
 
     THIS_SECTION="req_x509_extensions_${PARENT_IA_SNAME}_${CERT_SNAME}"
-    echo "DEBUG: DEBUG: THIS_SECTION: $THIS_SECTION"
-    echo "DEBUG: DEBUG: CERT_EXT_FNAME: $CERT_EXT_FNAME"  #TODO mispelling
-    echo "DEBUG: DEBUG: PARENT_IA_OPENSSL_CNF: $PARENT_IA_OPENSSL_CNF"
-    create_internode_config "$THIS_SECTION" \
-                            "$CERT_EXT_FNAME" \
-                            "$PARENT_IA_OPENSSL_CNF"
+    create_internode_config "ca" "$THIS_SECTION" "$PARENT_IA_OPENSSL_CNF_CA_EXTFILE"
 
-    ca_renew_certificate "$CERT_EXT_FNAME" "$THIS_SECTION"
+    ca_renew_certificate "$CERT_OPENSSL_CNF_REQ_EXTFILE" "$THIS_SECTION"
 
     cert_create_revocation_list
 
@@ -1162,10 +1277,13 @@ function cmd_renew_cert {
     echo "  $CERT_CA_TYPE cert req   : $CERT_CSR_PEM"
     echo "  $CERT_CA_TYPE certificate: $CERT_CERT_PEM"
     echo "  $CERT_CA_TYPE private key: $CERT_KEY_PEM"
-    echo "  $CERT_CA_TYPE new cert   : $PARENT_IA_NEWCERT_NEW_PEM"
+    echo "  $CERT_CA_TYPE new cert   : $PARENT_IA_NPARENT_IA_NEWCERT_NEW_PEM"
     echo "  $CERT_CA_TYPE chain cert : $CERT_CHAIN_PEM"
     echo "  $CERT_CA_TYPE CRL        : $CERT_CRL_PEM"
-    echo "  $CERT_CA_TYPE extension  : $IA_OPENSSL_CNF_EXT"
+    echo "  $CERT_CA_TYPE REQ cnf    : $CERT_OPENSSL_CNF_REQ_FILE"
+    echo "  $CERT_CA_TYPE REQ cnf extension  : $CERT_OPENSSL_CNF_REQ_EXTFILE"
+    echo "  $CERT_CA_TYPE CA cnf    : $PARENT_IA_OPENSSL_CNF_CA_FILE"
+    echo "  $CERT_CA_TYPE CA cnf extension  : $PARENT_IA_OPENSSL_CNF_CA_EXTFILE"
 }
 
 
@@ -1174,7 +1292,7 @@ function cmd_renew_cert {
 ##################################################
 function cmd_revoke_cert {
     # Obtain current serial ID
-    NEXT_SERIAL_ID="$(cat $CERT_SERIAL_DB)"
+    NEXT_SERIAL_ID="$(cat $PARENT_IA_SERIAL_DB)"
     hex_decrement "$NEXT_SERIAL_ID"
     CURRENT_SERIAL_ID="$HEX_VALUE_PREV"
 
@@ -1193,10 +1311,10 @@ function cmd_revoke_cert {
         # openssl ca -revoke /etc/ssl/newcerts/1013.pem #replacing the serial number
         ${OPENSSL_CA} -revoke "$REVOKING_CERT_FILE"
         RETSTS=$?
-        if [[ $RETSTS -ne 0 ]]; then
+        if [[ ${RETSTS} -ne 0 ]]; then
             echo "Error $RETSTS during 'openssl ca'"
             echo "Command used: $OPENSSL_CA -revoke $REVOKING_CERT_FILE"
-            exit $RETSTS
+            exit ${RETSTS}
         fi
     fi
 
@@ -1221,9 +1339,9 @@ function cmd_verify_cert {
 
     # Visual Inspection:
     # check a certificate, its expiration date and who signed it
-    openssl x509 -noout -text -in "$CERT_CERT_PEM"
+    ${OPENSSL_X509} -noout -text -in "$CERT_CERT_PEM"
     RETSTS=$?
-    if [[ $RETSTS -ne 0 ]]; then
+    if [[ ${RETSTS} -ne 0 ]]; then
         echo "FAIL: Unable to view certificate: $CERT_CSR_PEM"
         exit 1
     fi
@@ -1233,28 +1351,28 @@ function cmd_verify_cert {
     echo "Certificate: $CERT_CERT_PEM"
 
     # Verify the key
-    openssl pkey -noout -in "$CERT_KEY_PEM" -check
+    ${OPENSSL_PKEY} -noout -in "$CERT_KEY_PEM" -check
     RETSTS=$?
-    if [[ $RETSTS -ne 0 ]]; then
+    if [[ ${RETSTS} -ne 0 ]]; then
         echo "Key $CERT_KEY_PEM: FAILED VERIFICATION"
     else
         echo "Key $CERT_KEY_PEM: verified"
     fi
 
     # Verify the CSR
-    openssl req -noout -verify -in "$CERT_CSR_PEM"
+    ${OPENSSL_REQ} -noout -verify -in "$CERT_CSR_PEM"
     RETSTS=$?
-    if [[ $RETSTS -ne 0 ]]; then
+    if [[ ${RETSTS} -ne 0 ]]; then
         echo "CSR $CERT_CSR_PEM: FAILED VERIFICATION"
     else
         echo "CSR $CERT_CSR_PEM: verified"
     fi
 
     # Verify the Certificate
-    openssl verify -no-CApath -no-CAstore \
+    ${OPENSSL_VERIFY} -no-CApath -no-CAstore \
         -CAfile "$PARENT_IA_CERT_PEM" "$CERT_CERT_PEM"
     RETSTS=$?
-    if [[ $RETSTS -ne 0 ]]; then
+    if [[ ${RETSTS} -ne 0 ]]; then
         echo "Certificate $CERT_CERT_PEM: FAILED VERIFICATION"
     else
         echo "Certificate $CERT_CERT_PEM: verified"
@@ -1268,10 +1386,10 @@ function cmd_verify_cert {
     ########################################
 
     # Checking MD5 hash
-    hashkey=$($OPENSSL_X509 -noout -in "$CERT_CERT_PEM" | \
-              $OPENSSL_MD5 )
-    hashcrt=$($OPENSSL_PKEY -noout -in "$CERT_KEY_PEM" | \
-              $OPENSSL_MD5 )
+    hashkey=$(${OPENSSL_X509} -noout -in "$CERT_CERT_PEM" | \
+              ${OPENSSL_MD5} )
+    hashcrt=$(${OPENSSL_PKEY} -noout -in "$CERT_KEY_PEM" | \
+              ${OPENSSL_MD5} )
     if [[ "${hashkey}" = "${hashcrt}" ]]; then
         echo "MD5 hash matches"
     else
@@ -1323,8 +1441,9 @@ function cmd_verify_cert {
 
         rm -rf "${TMP}"
 
-        CERT_SERIAL_ID_NEXT=$(cat "${CERT_SERIAL_DB}")
+        CERT_SERIAL_ID_NEXT=$(cat "${PARENT_IA_SERIAL_DB}")
         hex_decrement "$CERT_SERIAL_ID_NEXT"
+
         CERT_SERIAL_ID_CURRENT="$HEX_VALUE_PREV"
         CA_NEWCERT_CURRENT_PEM="$CERT_NEWCERTS_ARCHIVE_DIR/${CERT_SERIAL_ID_CURRENT}.pem"
 
@@ -1571,7 +1690,7 @@ fi
 #
 
 #### IA_URL_BASE="$DEFAULT_CA_X509_URL_BASE"
-IA_OPENSSL_CA_OPT="-selfsign"
+IA_OPENSSL_CA_OPT=""
 X509_COUNTRY="$DEFAULT_CA_X509_COUNTRY"
 X509_STATE="$DEFAULT_CA_X509_STATE"
 X509_LOCALITY="$DEFAULT_CA_X509_LOCALITY"
@@ -1736,7 +1855,7 @@ directory_file_layout "$OFSTD_LAYOUT" "$OFSTD_DIR_TREE_TYPE" \
                       "$SSL_DIR" "$CERT_NAME" "$PARENT_IA_NAME"
 
 # If parent CA specified, ALWAYS CHECK for parent CA directory
-if [[ -n "$PARENT_IA_DIR" ]]; then
+if [[ ! -f "$PARENT_IA_DIR" ]]; then
     if [[ ! -d "$PARENT_IA_DIR" ]]; then
         echo "Parent '$PARENT_IA_NAME' CA directory does not exist"
         echo "Probably forgot '-p root' command line option or something"
@@ -1744,26 +1863,49 @@ if [[ -n "$PARENT_IA_DIR" ]]; then
     fi
 fi
 
-
+# OpenSSL hardcoded two environment variables: OPENSSL_CONF and SSL_CERT_FILE.
 # It's stupid that we have to export this OpenSSL configuration filespec
 # If we didn't, it would 'furtively' refer to it's built-in /usr/lib/openssl/openssl.cnf if no '-config' were used as 'strace -f' has shown.
-export OPENSSL_CONF="$IA_OPENSSL_CNF"
+# We shall have full control over what files that OpenSSL will attempts to open.
+export OPENSSL_CONF="$CERT_OPENSSL_CNF_REQ_FILE"
 export SSL_CERT_FILE="/dev/null"
 
+# Four separate configuration files are needed for a certificate creation
+# Two of the files are used during 'openssl req' command:
+#  1. Generalized certificate OpenSSL configuration file
+#  2. Type-of-Certificate Request Extension file
+CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}-req-${CERT_FNAME}.cnf"
+CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}-req-${CERT_FNAME}.extensions.cnf"
+
+#
+# Other two files are used during 'openssl ca' command:
+#  1. Signing CA main config file (must match to ones created by tls-ca-manage.sh)
+#  2. Type-of-Certificate CA Extension file
+PARENT_IA_OPENSSL_CNF_CA_FILE="$CERT_EXT_DIR/$PARENT_IA_FNAME.cnf"
+PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$CERT_EXT_DIR/$PARENT_IA_FNAME-${CERT_FNAME}.extensions.cnf"
+#
+# We create three of those files, exactly once despite multiple execution.
+# Force (-f) option will help delete those files and replace it with new ones
+# This makes it possible to customize these files (until -f option gets used)
+#
+# We auto-custom 'section_name' between file #1 and #2 in each 'openssl req'
+# and 'openssl ca' commands, to tie these two files together.
+#
+# In 'openssl ca', section name is a simplified parent node name
 THIS_SECTION="req_x509_extensions_${PARENT_IA_SNAME}_${CERT_SNAME}"
-IA_EXT_FNAME="$CERT_EXT_DIR/${PARENT_IA_FNAME}_req_x509_extensions_${CERT_FNAME}.cnf"
 
 PARENT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/cert_req_${CA_TYPE}.cnf"
 ### CERT_OPENSSL_CNF_EXT_FILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}_cert_x509_extensions_${CERT_FNAME}.cnf"
 
 # Define all the OpenSSL commands
-OPENSSL_REQ="$OPENSSL req -config ${PARENT_OPENSSL_CNF_REQ_FILE}"
+OPENSSL_REQ="$OPENSSL req -config ${CERT_OPENSSL_CNF_REQ_FILE}"
 [[ ${VERBOSITY} -ne 0 ]] && OPENSSL_REQ="$OPENSSL_REQ -verbose"
 OPENSSL_X509="$OPENSSL x509"
 OPENSSL_MD5="$OPENSSL md5"
-OPENSSL_CA="$OPENSSL ca -config ${PARENT_OPENSSL_CNF_CA_FILE}"
+OPENSSL_CA="$OPENSSL ca -config ${PARENT_IA_OPENSSL_CNF_CA_FILE}"
 [[ ${VERBOSITY} -ne 0 ]] && OPENSSL_CA="${OPENSSL_CA} -verbose"
 OPENSSL_PKEY="$OPENSSL pkey"
+OPENSSL_VERIFY="$OPENSSL verify"
 
 case "$CMD_MODE" in
   verify)
