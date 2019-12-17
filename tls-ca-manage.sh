@@ -1624,19 +1624,20 @@ function cmd_renew_ca {
 # CLI revoke command                             #
 ##################################################
 function cmd_revoke_ca {
-    # Obtain current serial ID
-    NEXT_SERIAL_ID="$(cat "$IA_SERIAL_DB")"
-    hex_decrement "$NEXT_SERIAL_ID"
-    CURRENT_SERIAL_ID="$HEX_VALUE_PREV"
 
-    # Read serialized file from $IA_CERTS_DIR (./certs)
+    echo "Revoking $IA_CERT_PEM PEM file..."
+    # Extract serial ID from this CRT PEM file
+    SERIAL_ID=$(openssl x509 -noout -serial -in $IA_CERT_PEM | awk -F= '{print $2}')
+    echo "Extracted serial id $SERIAL_ID from that PEM file."
+
+    REVOKING_CERT_FILE="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${SERIAL_ID}.pem"
+    echo "Pointing to $REVOKING_CERT_FILE PEM file for revocation."
+
     # -keyfile and -cert are not needed if an openssl.cnf is proper
-    REVOKING_CERT_FILE="$IA_NEWCERTS_ARCHIVE_DIR/$CURRENT_SERIAL_ID.pem"
 
     ${OPENSSL_X509} -noout -text \
         -in "$REVOKING_CERT_FILE"
 
-    echo "Certificate file: $REVOKING_CERT_FILE"
     echo -n "Revoke above certificate? (y/N): "
     read -r REVOKE_THIS_ONE
     if [[ "$REVOKE_THIS_ONE" == "y" ]]; then
