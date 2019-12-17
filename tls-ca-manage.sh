@@ -255,6 +255,7 @@ DEFAULT_USER_NAME=${USER}  # tells most IDE syntax checker to say that $USER is 
 # No DEFAULT_ROOT_CA_NAME
 # DEFAULT_INT_CA_NAME="network"
 # DEFAULT_SIGNING_CA_NAME="component"
+DEFAULT_NODE_TYPE="standalone"
 
 DEFAULT_FILETYPE_KEY="key"   # sometimes .private
 DEFAULT_FILETYPE_CSR="csr"   # sometimes .req, .request (PKCS#10)
@@ -358,21 +359,21 @@ function directory_file_layout {
     if [[ -z ${PARENT_IA_NAME} ]]; then
         # root CA
         NO_PARENT=1
-        IA_CA_TYPE="Parent CA"
+        PARENT_TYPE_STR="Parent CA"
         PARENT_IA_NAME="$IA_NAME"
     else
         # intermediate
         NO_PARENT=0
-        IA_CA_TYPE="Intermediate CA"
+        PARENT_TYPE_STR="Intermediate CA"
     fi
 
     if [[ "$VERBOSITY" -ne 0 ]]; then
-        echo "IA_CA_TYPE: $IA_CA_TYPE"
+        echo "NODE_TYPE: $NODE_TYPE"
+        echo "PARENT_TYPE_STR: $PARENT_TYPE_STR"
         echo "PARENT_IA_NAME: $PARENT_IA_NAME"
     fi
 
     if [[ "$VERBOSITY" -gt 1 ]]; then
-        echo "PARENT_IA_NAME: $PARENT_IA_NAME"
         echo "IA_NAME: $IA_NAME"
     fi
 
@@ -586,18 +587,21 @@ function directory_file_layout {
     PARENT_IA_CRL_DB="$PARENT_IA_CRL_DB_DIR/$PARENT_IA_CRLNUMBER_FNAME"
 
     if [[ "$VERBOSITY" -gt 1 ]]; then
-        echo "PARENT_IA_KEY_PEM: $PARENT_IA_KEY_PEM"
         echo "IA_KEY_PEM: $IA_KEY_PEM"
         echo "IA_CSR_PEM: $IA_CSR_PEM"
         echo "IA_CERT_PEM: $IA_CERT_PEM"
-        echo "PARENT_IA_CERT_PEM: $PARENT_IA_CERT_PEM"
         echo "IA_CRL_PEM: $IA_CRL_PEM"
         echo "IA_CHAIN_PEM: $IA_CHAIN_PEM"
-        echo "IA_INDEX_DB: $IA_INDEX_DB"
-        echo "PARENT_IA_INDEX_DB: $PARENT_IA_INDEX_DB"
         echo "IA_SERIAL_DB: $IA_SERIAL_DB"
-        echo "PARENT_IA_SERIAL_DB: $PARENT_IA_SERIAL_DB"
+        echo "IA_INDEX_DB: $IA_INDEX_DB"
         echo "IA_CRL_DB: $IA_CRL_DB"
+        echo "PARENT_IA_KEY_PEM: $PARENT_IA_KEY_PEM"
+        # We do not care about PARENT_IA_CSR_PEM file here
+        echo "PARENT_IA_CERT_PEM: $PARENT_IA_CERT_PEM"
+        # We do not care about PARENT_IA_CRL_PEM file here
+        # We do not care about PARENT_IA_CHAIN_PEM file here
+        echo "PARENT_IA_SERIAL_DB: $PARENT_IA_SERIAL_DB"
+        echo "PARENT_IA_INDEX_DB: $PARENT_IA_INDEX_DB"
         echo "PARENT_IA_CRL_DB: $PARENT_IA_CRL_DB"
     fi
     IA_SERIAL_DB="$IA_SERIAL_DB_DIR/$IA_SERIAL_FNAME"
@@ -787,7 +791,7 @@ function data_entry_generic {
     input_x509_data "Contact email: " "$X509_EMAIL"
     X509_EMAIL="$INPUT_DATA"
     input_x509_data "Base URL: " "$X509_URL_BASE"
-    X509_URL="$INPUT_DATA"
+    X509_URL_BASE="$INPUT_DATA"
     input_x509_data "CRL URL: " "$X509_CRL"
     X509_CRL="$INPUT_DATA"
 }
@@ -843,7 +847,7 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_EKU=""  # extendedKeyUsage
       CNF_CA_EXT_SAN=""  # subjectAltName
       # CNF_CA_EXT_AIA="@issuer_info"
-      CNF_CA_EXT_AIA="caIssuers;URI:${IA_URL_BASE}/${IA_CHAIN_FNAME}.cer"
+      CNF_CA_EXT_AIA="caIssuers;URI:${X509_URL_BASE}/${IA_CHAIN_FNAME}.cer"
       ;;
     end|endnode|signing|network|software|tls)
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
@@ -1041,6 +1045,8 @@ function create_internode_config
     write_line_or_no "crlDistributionPoint"   "" "$CIC_INTERNODE_CONFIG_FILESPEC"
     echo "$CNF_CA_EXT_EXTRA" >> "$CIC_INTERNODE_CONFIG_FILESPEC"
 
+    change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CIC_INTERNODE_CONFIG_FILESPEC"
+
     unset CIC_SECTION_NAME
     unset CIC_INTERNODE_CONFIG_FILESPEC
     unset CIC_PARENT_CONFIG_FILESPEC
@@ -1051,10 +1057,9 @@ function create_internode_config
 # Usage: openssl_cnf_create_ca <ca_name>
 function openssl_cnf_create_ca
 {
-  OCCC_CA_NAME=$1
-  if [[ -z "$OCCC_CA_NAME" ]]; then
-    OCCC_CA_NAME="$IA_NAME"
-  fi
+  OCCC_NODE_TYPE=$1
+  OCCC_CA_NAME=$2
+  OCCC_CA_SECTION_LABEL="${NODE_TYPE}_${OCCC_CA_NAME}"
   echo "Creating $IA_OPENSSL_CNF file for $OCCC_CA_NAME..."
   TIMESTAMP="$(date)"
   echo """
@@ -1063,15 +1068,15 @@ function openssl_cnf_create_ca
 # Created on: $TIMESTAMP
 #
 # CA Name: ${OCCC_CA_NAME}
-# CA Type: ${IA_CA_TYPE}
+# CA Node Type: ${NODE_TYPE}
 #
 
-base_url                = ${IA_URL_BASE}        # CA base URL
-aia_url                 = ${IA_URL_BASE}/${IA_CERT_FNAME}     # CA certificate URL
-crl_url                 = ${IA_URL_BASE}/${IA_CRL_FNAME}     # CRL distribution point
-ocsp_url                = ${IA_URL_BASE}/ocsp
+base_url                = ${X509_URL_BASE}        # CA base URL
+aia_url                 = ${X509_URL_BASE}/${IA_CERT_FNAME}     # CA certificate URL
+crl_url                 = ${X509_URL_BASE}/${IA_CRL_FNAME}     # CRL distribution point
+ocsp_url                = ${X509_URL_BASE}/ocsp
 
-# CA certificate request
+# CA certificate request via 'openssl req ...' command
 [ req ]
 default_bits            = ${KEYSIZE_BITS}       # RSA key size
 encrypt_key             = yes                   # Protect private key
@@ -1080,10 +1085,10 @@ utf8                    = yes                   # Input is UTF-8
 string_mask             = utf8only              # Emit UTF-8 strings
 # if promt is 'yes', then [ ca_dn ] needs changing
 prompt                  = no                    # Don't prompt for DN
-distinguished_name      = ca_dn                 # DN section
-req_extensions          = ca_reqext             # Desired extensions
+distinguished_name      = ${OCCC_CA_SECTION_LABEL}_dn                 # DN section
+req_extensions          = ${OCCC_CA_SECTION_LABEL}_reqext             # Desired extensions
 
-[ ca_dn ]
+[ ${OCCC_CA_SECTION_LABEL}_dn ]
 countryName             = ${X509_COUNTRY}
 stateOrProvinceName     = ${X509_STATE}
 localityName            = ${X509_LOCALITY}
@@ -1096,17 +1101,18 @@ organizationalUnitName  = ${X509_OU}
 commonName              = ${X509_COMMON}
 emailAddress            = ${X509_EMAIL}
 
-[ ca_reqext ]
+[ ${OCCC_CA_SECTION_LABEL}_reqext ]
 keyUsage                = ${CNF_REQ_EXT_KU}
 basicConstraints        = ${CNF_REQ_EXT_BC}
 subjectKeyIdentifier    = ${CNF_REQ_EXT_SKI}
 
 # CA operational settings
 
+# signs the CSR and create certificate authority certificate request via 'openssl ca ...' command
 [ ca ]
-default_ca              = root_ca               # The default CA section
+default_ca              = ${OCCC_CA_SECTION_LABEL}_ca               # The default CA section
 
-[ root_ca ]
+[ ${OCCC_CA_SECTION_LABEL}_ca ]
 certificate             = ${IA_CERT_PEM}        # The CA cert
 private_key             = ${IA_KEY_PEM}         # CA private key
 new_certs_dir           = ${IA_NEWCERTS_ARCHIVE_DIR} # Certificate archive
@@ -1171,7 +1177,9 @@ RSA.Certificate = server-rsa.pem
 ECDSA.Certificate = server-ecdsa.pem
 
 """ > "$IA_OPENSSL_CNF"
-  echo "Created $IA_CA_TYPE $IA_OPENSSL_CNF file"
+
+  change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_OPENSSL_CNF"
+  echo "Created $PARENT_TYPE_STR $IA_OPENSSL_CNF file"
 }
 
 #########################################################
@@ -1196,7 +1204,7 @@ function ca_create_public_key
         exit ${RETSTS}
     fi
     if [[ ! -f "$IA_KEY_PEM" ]]; then
-        echo "Failed to create private key for $IA_CA_TYPE ($IA_KEY_PEM)"
+        echo "Failed to create private key for $PARENT_TYPE_STR ($IA_KEY_PEM)"
         exit 126 # ENOKEY
     fi
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_KEY_PEM"
@@ -1227,7 +1235,7 @@ function ca_create_csr
         exit ${RETSTS}
     fi
     if [[ ! -f "$IA_CSR_PEM" ]]; then
-        echo "Failed to create signing request for $IA_CA_TYPE ($IA_CSR_PEM)"
+        echo "Failed to create signing request for $PARENT_TYPE_STR ($IA_CSR_PEM)"
         exit 2 # ENOENT
     fi
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_CSR_PEM"
@@ -1243,7 +1251,7 @@ function ca_create_csr
 # Parent CA accept CA node's CSR by trusting  #
 ###############################################
 function ca_create_certificate {
-    echo "Creating $IA_CA_TYPE certificate ..."
+    echo "Creating $PARENT_TYPE_STR certificate ..."
     IA_OPENSSL_CNF_EXTFILE="$1"
     IA_OPENSSL_CNF_EXTENSION="$2"
     ${OPENSSL_CA} \
@@ -1265,7 +1273,7 @@ function ca_create_certificate {
 
     # bundle chains are made only in non-root depth mode
     if [[ "$DEPTH_MODE" != "root" ]]; then
-        echo "Creating $IA_CA_TYPE chain certificate ..."
+        echo "Creating $PARENT_TYPE_STR chain certificate ..."
         echo "cat ${IA_CERT_PEM} ${PARENT_IA_CERT_PEM} > ${IA_CHAIN_PEM}"
         cat "${IA_CERT_PEM}" "${PARENT_IA_CERT_PEM}" > "${IA_CHAIN_PEM}"
         change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_CHAIN_PEM"
@@ -1276,7 +1284,7 @@ function ca_create_certificate {
 
 function ca_create_revocation_list
 {
-    echo "Creating $IA_CA_TYPE certificate revocation list (CRL)..."
+    echo "Creating $PARENT_TYPE_STR certificate revocation list (CRL)..."
     ${OPENSSL_CA} \
         -gencrl \
         -config "$IA_OPENSSL_CNF" \
@@ -1300,7 +1308,7 @@ function ca_extract_signing_request
         exit ${RETSTS}
     fi
     if [[ ! -f "$IA_CSR_PEM" ]]; then
-        echo "Failed to recreate request key from $IA_CA_TYPE ($IA_CSR_PEM)"
+        echo "Failed to recreate request key from $PARENT_TYPE_STR ($IA_CSR_PEM)"
         exit 2 #ENOENT
     fi
     if [[ ${VERBOSITY} -ne 0 ]]; then
@@ -1331,7 +1339,7 @@ function ca_renew_certificate
         exit ${RETSTS}
     fi
     if [[ ! -f "$IA_CERT_PEM" ]]; then
-        echo "Failed to recreate $IA_CA_TYPE certificate ($IA_CERT_PEM}"
+        echo "Failed to recreate $PARENT_TYPE_STR certificate ($IA_CERT_PEM}"
         exit 2 # ENOENT
     fi
     unset IA_OPENSSL_CNF_EXTFILE
@@ -1342,7 +1350,7 @@ function ca_create_chain_certificate
 {
     # chains are made only in non-root depth mode
     if [[ "$DEPTH_MODE" != "root" ]]; then
-        echo "Creating $IA_CA_TYPE chain certificate ..."
+        echo "Creating $PARENT_TYPE_STR chain certificate ..."
         cat "${IA_CERT_PEM}" "${PARENT_IA_CERT_PEM}" > "${IA_CHAIN_PEM}"
     fi
 }
@@ -1391,16 +1399,16 @@ function display_ca_certificate {
     echo "$(${OPENSSL_X509} -noout -modulus -in "$THIS_PEM" | ${OPENSSL_MD5}) $THIS_PEM"
 
     if [[ "$VERBOSITY" -ne 0 ]]; then
-        echo "Decoding $IA_CA_TYPE certificate:"
+        echo "Decoding $PARENT_TYPE_STR certificate:"
         ${OPENSSL_X509} -in "$THIS_PEM" -noout -text
     else
-        echo "To see decoded $IA_CA_TYPE certificate, execute:"
+        echo "To see decoded $PARENT_TYPE_STR certificate, execute:"
         echo "  $OPENSSL_X509 -in $THIS_PEM -noout -text"
     fi
 }
 
 function delete_any_old_ca_files {
-    [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $IA_CA_TYPE certificate..."
+    [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $PARENT_TYPE_STR certificate..."
     # Yeah, yeah, yeah; destructive but this is a new infrastructure
     if [[ -d "$IA_DIR" ]]; then
         echo "WHOA! Directory $IA_DIR already exist."
@@ -1436,7 +1444,7 @@ function cmd_create_ca {
     create_ca_dirfiles
 
     if [[ ${VERBOSITY} -ne 0 ]]; then
-        echo "$IA_CA_TYPE subdirectory:  $(ls -1lad "$SSL_CA_DIR"/)"
+        echo "$PARENT_TYPE_STR subdirectory:  $(ls -1lad "$SSL_CA_DIR"/)"
     fi
 
     cd "$SSL_CA_DIR" || exit 65  # ENOPKG
@@ -1451,8 +1459,8 @@ function cmd_create_ca {
         fi
     fi
 
-    echo "DEBUG: DEBUG: CA_TYPE: $CA_TYPE"
-    get_x509v3_extension_by_ca_type "$CA_TYPE" -1
+    echo "DEBUG: DEBUG: CA_TYPE: $NODE_TYPE"
+    get_x509v3_extension_by_ca_type "$NODE_TYPE" -1
 
     # Clone OpenSSL configuration file into CA-specific subdirectory
     if [[ ! -f "$IA_OPENSSL_CNF" ]]; then
@@ -1463,7 +1471,7 @@ function cmd_create_ca {
             echo "WHOA NELLY!"
             exit 2
         fi
-        openssl_cnf_create_ca "$DEPTH_MODE"
+        openssl_cnf_create_ca "$NODE_TYPE" "$IA_NAME"
     fi
 
     # OpenSSL serial accounting
@@ -1473,7 +1481,7 @@ function cmd_create_ca {
     ca_serialization_and_unique_filenames
     [[ ${VERBOSITY} -ne 0 ]] && echo "Serial ID (starting): $PARENT_IA_SERIAL_ID_NEXT"
 
-    [[ "$VERBOSITY" -ne 0 ]] && echo "Creating $IA_CA_TYPE private key ..."
+    [[ "$VERBOSITY" -ne 0 ]] && echo "Creating $PARENT_TYPE_STR private key ..."
 
     ca_create_public_key
 
@@ -1514,14 +1522,14 @@ function cmd_create_ca {
     display_ca_certificate "$IA_CERT_PEM"
 
     echo "Created the following files:"
-    echo "  $IA_CA_TYPE cert req   : $IA_CSR_PEM"
-    echo "  $IA_CA_TYPE certificate: $IA_CERT_PEM"
-    echo "  $IA_CA_TYPE private key: $IA_KEY_PEM"
-    echo "  $IA_CA_TYPE new cert   : $PARENT_IA_NEWCERT_NEW_PEM"
+    echo "  $PARENT_TYPE_STR cert req   : $IA_CSR_PEM"
+    echo "  $PARENT_TYPE_STR certificate: $IA_CERT_PEM"
+    echo "  $PARENT_TYPE_STR private key: $IA_KEY_PEM"
+    echo "  $PARENT_TYPE_STR new cert   : $PARENT_IA_NEWCERT_NEW_PEM"
     if [[ "$DEPTH_MODE" != "root" ]]; then
-        echo "  $IA_CA_TYPE chain cert : $IA_CHAIN_PEM"
+        echo "  $PARENT_TYPE_STR chain cert : $IA_CHAIN_PEM"
     fi
-    echo "  $IA_CA_TYPE CRL        : $IA_CRL_PEM"
+    echo "  $PARENT_TYPE_STR CRL        : $IA_CRL_PEM"
 }
 
 
@@ -1581,8 +1589,8 @@ function cmd_renew_ca {
 
     ca_extract_signing_request
 
-    echo "DEBUG: DEBUG: CA_TYPE: $CA_TYPE"
-    get_x509v3_extension_by_ca_type "$CA_TYPE" -1
+    echo "DEBUG: DEBUG: CA_TYPE: $NODE_TYPE"
+    get_x509v3_extension_by_ca_type "$NODE_TYPE" -1
 
     THIS_SECTION="ca_x509_extensions_${PARENT_IA_SNAME}_${IA_SNAME}"
     IA_EXT_FNAME="$IA_EXT_DIR/${PARENT_IA_FNAME}_ca_x509_extensions_${IA_FNAME}.cnf"
@@ -1602,13 +1610,13 @@ function cmd_renew_ca {
     display_ca_certificate "$IA_CERT_PEM"
 
     echo "Created the following files:"
-    echo "  $IA_CA_TYPE cert req   : $IA_CSR_PEM"
-    echo "  $IA_CA_TYPE certificate: $IA_CERT_PEM"
-    echo "  $IA_CA_TYPE private key: $IA_KEY_PEM"
-    echo "  $IA_CA_TYPE new cert   : $PARENT_IA_NEWCERT_NEW_PEM"
-    echo "  $IA_CA_TYPE chain cert : $IA_CHAIN_PEM"
-    echo "  $IA_CA_TYPE CRL        : $IA_CRL_PEM"
-    echo "  $IA_CA_TYPE extension  : $IA_OPENSSL_CNF_EXTFILE"
+    echo "  $PARENT_TYPE_STR cert req   : $IA_CSR_PEM"
+    echo "  $PARENT_TYPE_STR certificate: $IA_CERT_PEM"
+    echo "  $PARENT_TYPE_STR private key: $IA_KEY_PEM"
+    echo "  $PARENT_TYPE_STR new cert   : $PARENT_IA_NEWCERT_NEW_PEM"
+    echo "  $PARENT_TYPE_STR chain cert : $IA_CHAIN_PEM"
+    echo "  $PARENT_TYPE_STR CRL        : $IA_CRL_PEM"
+    echo "  $PARENT_TYPE_STR extension  : $IA_OPENSSL_CNF_EXTFILE"
 }
 
 
@@ -1766,13 +1774,13 @@ function cmd_verify_ca {
 
         rm -rf "${TMP}"
 
-        IA_SERIAL_ID_NEXT=$(cat "${IA_SERIAL_DB}")
-        hex_decrement "$IA_SERIAL_ID_NEXT"
-        IA_SERIAL_ID_CURRENT="$HEX_VALUE_PREV"
-        CA_NEWCERT_CURRENT_PEM="$IA_NEWCERTS_ARCHIVE_DIR/${IA_SERIAL_ID_CURRENT}.pem"
+        # Extract serial ID from CRT PEM file
+        SERIAL_ID=$(openssl x509 -noout -serial -in $IA_CERT_PEM | awk -F= '{print $2}')
+        CA_NEWCERT_CURRENT_PEM="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${SERIAL_ID}.pem"
 
         next_pem="$(${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_CURRENT_PEM" | ${OPENSSL_MD5})"
         current_pem="$(${OPENSSL_X509} -noout -modulus -in "$IA_CERT_PEM" | ${OPENSSL_MD5})"
+
         if [[ "$next_pem" == "$current_pem" ]]; then
             echo "Archive matches"
         else
@@ -1817,6 +1825,7 @@ OFSTD_DIR_TREE_TYPE="$DEFAULT_OFSTD_DIR_TREE_TYPE"
 DEPTH_MODE="root"
 FORCE_DELETE_CONFIG=0
 CIPHER="$DEFAULT_CIPHER"
+NODE_TYPE="$DEFAULT_NODE_TYPE"
 
 eval set -- "${options}"
 while true; do
@@ -1879,53 +1888,56 @@ while true; do
 # ocsp email identity encryption codesign timestamping
     -t|--ca-type)
         shift;
-        CA_TYPE=$1
-        case "$CA_TYPE" in
+        NODE_TYPE=$1
+        case "$NODE_TYPE" in
           standalone)
-            CA_TYPE="standalone"
+            NODE_TYPE="standalone"
             ;;
           root)
-            CA_TYPE="root"
+            NODE_TYPE="root"
             ;;
           intermediate)
-            CA_TYPE="intermediate"
+            NODE_TYPE="intermediate"
             ;;
           identity)
-            CA_TYPE="identity"
+            NODE_TYPE="identity"
             ;;
           network)
-            CA_TYPE="network"
+            NODE_TYPE="network"
             ;;
           component)
-            CA_TYPE="component"
+            NODE_TYPE="component"
             ;;
           security)
-            CA_TYPE="security"
+            NODE_TYPE="security"
             ;;
           server)
-            CA_TYPE="server"
+            NODE_TYPE="server"
             ;;
           client)
-            CA_TYPE="client"
+            NODE_TYPE="client"
             ;;
           ocsp)
-            CA_TYPE="ocsp"
+            NODE_TYPE="ocsp"
             ;;
           timestamping)
-            CA_TYPE="timestamping"
+            NODE_TYPE="timestamping"
             ;;
           email)
-            CA_TYPE="email"
+            NODE_TYPE="email"
             ;;
           encryption)
-            CA_TYPE="encryption"
+            NODE_TYPE="encryption"
             ;;
           codesign)
-            CA_TYPE="codesign"
+            NODE_TYPE="codesign"
             ;;
           *)
-            echo "Error in --ca-type $CA_TYPE argument."
-            echo "Valid options are root, intermediate, identity"
+            echo "Error in --ca-type $NODE_TYPE argument."
+            echo "Valid options are standalone, root, intermediate, identity, network,"
+            echo "                  component, security, server, client, ocsp,"
+            echo "                  timestamping, email, encryption, codesign,"
+            echo "                  and proxy."
             exit 255
             ;;
         esac
@@ -2012,7 +2024,6 @@ fi
 
 # Ok, which depth mode are we in to work on as issuing authority?
 if [[ "$DEPTH_MODE" == "intermediate" ]]; then
-  IA_URL_BASE="$DEFAULT_INTCA_X509_URL_BASE"
   X509_COUNTRY="$DEFAULT_INTCA_X509_COUNTRY"
   X509_STATE="$DEFAULT_INTCA_X509_STATE"
   X509_LOCALITY="$DEFAULT_INTCA_X509_LOCALITY"
@@ -2023,7 +2034,6 @@ if [[ "$DEPTH_MODE" == "intermediate" ]]; then
   X509_URL_BASE="$DEFAULT_INTCA_X509_URL_BASE"
   X509_CRL="$DEFAULT_INTCA_X509_CRL"
 else
-  IA_URL_BASE="$DEFAULT_CA_X509_URL_BASE"
   IA_OPENSSL_CA_OPT="-selfsign"
   X509_COUNTRY="$DEFAULT_CA_X509_COUNTRY"
   X509_STATE="$DEFAULT_CA_X509_STATE"
@@ -2203,8 +2213,8 @@ fi
 # It's stupid that we have to export this OpenSSL configuration filespec
 # If we didn't, it would 'furtively' refer to it's built-in /usr/lib/openssl/openssl.cnf if no '-config' were used as 'strace -f' has shown.
 export OPENSSL_CONF="$IA_OPENSSL_CNF"
-unset OPENSSL_FIPS=
-unset OPENSSL_DEBUG_MEMORY=
+unset OPENSSL_FIPS
+unset OPENSSL_DEBUG_MEMORY
 export OPENSSL_TRACE="TRACE,X509V3_POLICY"
 export SSL_CERT_FILE="/dev/null"
 
