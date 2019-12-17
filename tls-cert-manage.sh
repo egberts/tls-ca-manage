@@ -615,6 +615,7 @@ function get_x509v3_extension_by_cert_type {
   case "$GXEBCT_CA_TYPE" in
     server)
       CNF_SECTION_REQ_EXT="section_server_req_x509v3_extension"
+      CNF_SECTION_CA_EXT="section_server_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"
       CNF_REQ_EXT_BC="CA:false"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -642,6 +643,7 @@ function get_x509v3_extension_by_cert_type {
       ;;
     client)
       CNF_SECTION_REQ_EXT="section_client_req_x509v3_extension"
+      CNF_SECTION_CA_EXT="section_client_ca_x509v3_extension"
       # CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"  # very old
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"
@@ -653,6 +655,7 @@ function get_x509v3_extension_by_cert_type {
       ;;
     timestamping)
       CNF_SECTION_REQ_EXT="section_timestamping_req_x509v3_extension"
+      CNF_SECTION_CA_EXT="section_timestamping_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -663,6 +666,7 @@ function get_x509v3_extension_by_cert_type {
       ;;
     ocsp)
       CNF_SECTION_REQ_EXT="section_ocspsign_req_x509v3_extension"
+      CNF_SECTION_CA_EXT="section_ocspsign_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -674,6 +678,7 @@ function get_x509v3_extension_by_cert_type {
       ;;
     email)
       CNF_SECTION_REQ_EXT="section_email_req_x509v3_extensions"
+      CNF_SECTION_CA_EXT="section_email_ca_x509v3_extensions"
       CNF_REQ_EXT_KU="critical,keyEncipherment"
       CNF_REQ_EXT_BC="CA:false"  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -684,6 +689,7 @@ function get_x509v3_extension_by_cert_type {
     ;;
     encryption)
       CNF_SECTION_REQ_EXT="section_encryption_req_x509v3_extension"
+      CNF_SECTION_CA_EXT="section_encryption_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"  # keyUsage
       CNF_REQ_EXT_BC=""  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -697,6 +703,7 @@ function get_x509v3_extension_by_cert_type {
       ;;
     identity)  # there's identity-ca and identity, this here is identity-ca
       CNF_SECTION_REQ_EXT="section_identity_req_x509v3_extension"
+      CNF_SECTION_CA_EXT="section_identity_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -708,6 +715,7 @@ function get_x509v3_extension_by_cert_type {
       ;;
     codesign)
       CNF_SECTION_REQ_EXT="section_codesign_req_x509v3_extension"
+      CNF_SECTION_CA_EXT="section_codesign_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -786,30 +794,31 @@ req_extensions          = $CGCRCF_SECTION_NAME     # Desired extensions
 
 [ ${CA_TYPE}_dn ]
 countryName               = Country Name (2-letter code)
-countryName_default       = US
+countryName_default       = \"$X509_COUNTRY\"
 countryName_min           = 2
 countryName_max           = 2
 
 stateOrProvinceName             = State or Province Name (full name)
-stateOrProvinceName_default     = Some-State
+stateOrProvinceName_default     = \"$X509_STATE\"
 
 localityName                    = Locality Name (eg, city)
+localityName_default            = \"$X509_LOCALITY\"
 
 0.organizationName              = \"Organization Name (eg, company)\"
-0.organizationName_default      = \"ACME Networks\"
+0.organizationName_default      = \"$X509_ORG\"
 # we can do this but it is not needed normally :-)
 #1.organizationName             = Second Organization Name (eg, company)
 #1.organizationName_default     = World Wide Web Pty Ltd
 
 organizationalUnitName          = Organizational Unit Name (eg, section)
-organizationalUnitName_default = \"ACME Intermediate CA B2\"
+organizationalUnitName_default = \"$X509_OU\"
 
 commonName                      = Common Name (e.g. server FQDN or YOUR name)
-commonName_default              = \"John Doe\"
+commonName_default              = \"$X509_COMMON\"
 commonName_max                  = 64
 
 emailAddress                    = Email Address
-emailAddress_default            = \"jdoe@example.invalid\"
+emailAddress_default            = \"$X509_EMAIL\"
 emailAddress_max                = 64
 
 # domainComponent is not used by 'identity.conf'
@@ -876,7 +885,11 @@ function create_generic_ca_extension_config_file
 #    ${CERT_NAME}:    this node
 #
 
-[ ocsp_info]
+
+base_url                = ${X509_BASE}        # CA base URL
+aia_url                 = ${X509_BASE}/${IA_CERT_FNAME}     # CA certificate URL
+crl_url                 = ${X509_BASE}/${IA_CRL_FNAME}     # CRL distribution point
+ocsp_url                = ${X509_BASE}/ocsp
 
 # Section name could be a simple ${CA_TYPE} name
 # But having CA_TYPE-CA_NAME makes it possible to support
@@ -892,6 +905,30 @@ function create_generic_ca_extension_config_file
     write_line_or_no "authorityInfoAccess"    "$CNF_CA_EXT_AIA" "$CCEC_EXTFILE"
     write_line_or_no "crlDistributionPoint"   "" "$CCEC_EXTFILE"
     echo "$CNF_CA_EXT_EXTRA" >> "$CCEC_EXTFILE"
+    echo """#
+[ ocsp_info ]
+caIssuers;URI.0         = \$aia_url
+OCSP;URI.0              = \$ocsp_url
+
+[ issuer_info ]
+caIssuers;URI.0         = \$aia_url
+
+[ crl_info ]
+URI.0                   = \$crl_url
+
+[openssl_init]
+ssl_conf = ssl_sect
+
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+MinProtocol = TLSv1.2
+CipherString = DEFAULT@SECLEVEL=2
+RSA.Certificate = server-rsa.pem
+ECDSA.Certificate = server-ecdsa.pem
+
+""" >> "$CCEC_EXTFILE"
     unset CCEC_SECTION_NAME
     unset CCEC_EXTFILE
     unset CCEC_TIMESTAMP

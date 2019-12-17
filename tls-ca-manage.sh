@@ -289,13 +289,17 @@ DEFAULT_INTCA_X509_URL_BASE="http://example.invalid/ca/subroot"
 DEFAULT_INTCA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
 
 
-function input_data {
+function input_x509_data {
   PROMPT="$1"
   DEFAULT_VALUE="$2"
   echo -n "$PROMPT (default: '$DEFAULT_VALUE'): "
   read -r INPUT_DATA
   if [[ -z "$INPUT_DATA" ]]; then
-    INPUT_DATA="$DEFAULT_VALUE"
+    if [[ -z "$DEFAULT_VALUE" ]]; then
+      INPUT_DATA="none"
+    else
+      INPUT_DATA="$DEFAULT_VALUE"
+    fi
   fi
   return
 }
@@ -768,23 +772,23 @@ function create_ca_dirfiles {
 
 function data_entry_generic {
     INPUT_DATA=
-    input_data "Organization" "$X509_ORG"
+    input_x509_data "Organization" "$X509_ORG"
     X509_ORG="$INPUT_DATA"
-    input_data "Org. Unit/Section/Division: " "$X509_OU"
+    input_x509_data "Org. Unit/Section/Division: " "$X509_OU"
     X509_OU="$INPUT_DATA"
-    input_data "Common Name: " "$X509_COMMON"
+    input_x509_data "Common Name: " "$X509_COMMON"
     X509_COMMON="$INPUT_DATA"
-    input_data "Country (2-char max.): " "$X509_COUNTRY"
+    input_x509_data "Country (2-char max.): " "$X509_COUNTRY"
     X509_COUNTRY="$INPUT_DATA"
-    input_data "State: " "$X509_STATE"
+    input_x509_data "State: " "$X509_STATE"
     X509_STATE="$INPUT_DATA"
-    input_data "Locality/City: " "$X509_LOCALITY"
+    input_x509_data "Locality/City: " "$X509_LOCALITY"
     X509_LOCALITY="$INPUT_DATA"
-    input_data "Contact email: " "$X509_EMAIL"
+    input_x509_data "Contact email: " "$X509_EMAIL"
     X509_EMAIL="$INPUT_DATA"
-    input_data "Base URL: " "$X509_URL_BASE"
+    input_x509_data "Base URL: " "$X509_URL_BASE"
     X509_URL="$INPUT_DATA"
-    input_data "CRL URL: " "$X509_CRL"
+    input_x509_data "CRL URL: " "$X509_CRL"
     X509_CRL="$INPUT_DATA"
 }
 
@@ -802,10 +806,11 @@ function get_x509v3_extension_by_ca_type {
   fi
   case "$GXEBCT_CA_TYPE" in
     standalone)
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
     # TODO Gonna need those CNF_REQ_ back in here again
       CNF_SECTION_REQ_EXT="section_test_ca_x509v3_extensions"
       CNF_CA_EXT_KU=""  # keyUsage
-      CNF_CA_EXT_BC="CA:false"  # basicConstraint
+      CNF_CA_EXT_BC="CA:false,pathlen:0"  # basicConstraint
       CNF_CA_EXT_SKI="" # subjectKeyIdentifier
       CNF_CA_EXT_AKI=""  # authorityKeyIdentifier
       CNF_CA_EXT_EKU=""  # extendedKeyUsage
@@ -813,6 +818,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_AIA="@issuer_info"
       ;;
     root)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_root_ca_x509v3_extensions"
       CNF_CA_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
       CNF_CA_EXT_BC="critical,CA:true"  # basicConstraint
@@ -824,6 +832,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_AIA=""
       ;;
     intermediate)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_${GXEBCT_CA_TYPE}_ca_x509v3_extensions"
       CNF_CA_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
       CNF_CA_EXT_BC="critical,CA:true"  # basicConstraint
@@ -835,6 +846,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_AIA="caIssuers;URI:${IA_URL_BASE}/${IA_CHAIN_FNAME}.cer"
       ;;
     end|endnode|signing|network|software|tls)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_${GXEBCT_CA_TYPE}_ca_x509v3_extensions"
       CNF_CA_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
       CNF_CA_EXT_BC="critical,CA:true,pathlen:0"  # basicConstraint
@@ -845,6 +859,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_AIA="caIssuers;@issuer_info"
       ;;
     server)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_server_ca_x509v3_extension"
       CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
       CNF_CA_EXT_BC="CA:false"
@@ -857,11 +874,13 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_EKU="serverAuth,clientAuth"
       # CNF_CA_EXT_SAN="\$ENV::SAN"  # subjectAltName
       CNF_CA_EXT_SAN=""  # subjectAltName
-      # CNF_CA_EXT_AIA="@ocsp_info"
-      # CNF_CA_EXT_AIA="@issuer_info"
+      CNF_CA_EXT_AIA="@ocsp_info"
       CNF_CA_EXT_AIA=""
       ;;
     client)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_client_ca_x509v3_extension"
       # CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"  # very old
       CNF_CA_EXT_KU="critical,digitalSignature"
@@ -873,6 +892,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_AIA="@issuer_info"
       ;;
     timestamping)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_timestamping_ca_x509v3_extension"
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"
@@ -883,6 +905,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_AIA="@issuer_info"
       ;;
     ocsp)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_ocspsign_ca_x509v3_extension"
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"
@@ -894,6 +919,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_EXTRA="noCheck = null"
       ;;
     email)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_email_ca_x509v3_extensions"
       CNF_CA_EXT_KU="critical,keyEncipherment"
       CNF_CA_EXT_BC="CA:false"  # basicConstraint
@@ -904,6 +932,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_AIA="@issuer_info"
     ;;
     encryption)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_encryption_ca_x509v3_extension"
       CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"  # keyUsage
       CNF_CA_EXT_BC=""  # basicConstraint
@@ -917,6 +948,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_AIA="@issuer_info"
       ;;
     identity)  # there's identity-ca and identity, this here is identity-ca
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_identity_ca_x509v3_extension"
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"  # basicConstraint
@@ -927,6 +961,9 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_AIA="@issuer_info"
       ;;
     codesign)
+      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_SECTION_REQ_EXT="section_codesign_ca_x509v3_extension"
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"  # basicConstraint
@@ -982,7 +1019,7 @@ function create_internode_config
 # Usage:
 #    openssl ca -config $CIC_PARENT_CONFIG_FILESPEC \\
 #        -extfile $CIC_INTERNODE_CONFIG_FILESPEC \\
-#        -extension $CIC_SECTION_NAME \\
+#        -extensions $CIC_SECTION_NAME \\
 #        ...
 #
 # Section Name breakdown:
@@ -1029,14 +1066,10 @@ function openssl_cnf_create_ca
 # CA Type: ${IA_CA_TYPE}
 #
 
-dir                     = ${IA_DIR}             # Top dir
 base_url                = ${IA_URL_BASE}        # CA base URL
 aia_url                 = ${IA_URL_BASE}/${IA_CERT_FNAME}     # CA certificate URL
 crl_url                 = ${IA_URL_BASE}/${IA_CRL_FNAME}     # CRL distribution point
-name_opt                = multiline,-esc_msb,utf8 # Display UTF-8 characters
-
-# openssl_conf - Special OpenSSL module (required)
-openssl_conf            = openssl_init
+ocsp_url                = ${IA_URL_BASE}/ocsp
 
 # CA certificate request
 [ req ]
@@ -1045,20 +1078,28 @@ encrypt_key             = yes                   # Protect private key
 default_md              = ${MESSAGE_DIGEST}     # MD to use
 utf8                    = yes                   # Input is UTF-8
 string_mask             = utf8only              # Emit UTF-8 strings
+# if promt is 'yes', then [ ca_dn ] needs changing
 prompt                  = no                    # Don't prompt for DN
 distinguished_name      = ca_dn                 # DN section
 req_extensions          = ca_reqext             # Desired extensions
 
 [ ca_dn ]
-countryName             = \"${X509_COUNTRY}\"
-organizationName        = \"${X509_ORG}\"
-organizationalUnitName  = \"${X509_OU}\"
-commonName              = \"${X509_COMMON}\"
+countryName             = ${X509_COUNTRY}
+stateOrProvinceName     = ${X509_STATE}
+localityName            = ${X509_LOCALITY}
+0.organizationName      = ${X509_ORG}
+
+# we can do this but it is not needed normally :-)
+#1.organizationName	= World Wide Web Pty Ltd
+
+organizationalUnitName  = ${X509_OU}
+commonName              = ${X509_COMMON}
+emailAddress            = ${X509_EMAIL}
 
 [ ca_reqext ]
-keyUsage                = critical,keyCertSign,cRLSign
-basicConstraints        = critical,CA:true
-subjectKeyIdentifier    = hash
+keyUsage                = ${CNF_REQ_EXT_KU}
+basicConstraints        = ${CNF_REQ_EXT_BC}
+subjectKeyIdentifier    = ${CNF_REQ_EXT_SKI}
 
 # CA operational settings
 
@@ -1106,6 +1147,10 @@ emailAddress            = optional
 [ crl_ext ]
 authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
+
+[ ocsp_info ]
+caIssuers;URI.0         = \$aia_url
+OCSP;URI.0              = \$ocsp_url
 
 [ issuer_info ]
 caIssuers;URI.0         = \$aia_url
@@ -1280,7 +1325,6 @@ function ca_renew_certificate
         -days 1095 \
         -in "$IA_CSR_PEM" \
         -out "$IA_CERT_PEM"
-        # -keyfile "$PARENT_IA_KEY_PEM" \
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
         echo "Error $RETSTS in 'openssl ca'; aborting..."
@@ -1407,6 +1451,9 @@ function cmd_create_ca {
         fi
     fi
 
+    echo "DEBUG: DEBUG: CA_TYPE: $CA_TYPE"
+    get_x509v3_extension_by_ca_type "$CA_TYPE" -1
+
     # Clone OpenSSL configuration file into CA-specific subdirectory
     if [[ ! -f "$IA_OPENSSL_CNF" ]]; then
         # Clone from default /etc/ssl/openssl.cnf
@@ -1432,9 +1479,6 @@ function cmd_create_ca {
 
     # Create PKCS#10 (Certificate Signing Request)
     ca_create_csr
-
-    echo "DEBUG: DEBUG: CA_TYPE: $CA_TYPE"
-    get_x509v3_extension_by_ca_type "$CA_TYPE" -1
 
     THIS_SECTION="ca_x509_extensions_${PARENT_IA_SNAME}_${IA_SNAME}"
     IA_EXT_FNAME="$IA_EXT_DIR/${PARENT_IA_FNAME}_ca_x509_extensions_${IA_FNAME}.cnf"
@@ -2159,6 +2203,9 @@ fi
 # It's stupid that we have to export this OpenSSL configuration filespec
 # If we didn't, it would 'furtively' refer to it's built-in /usr/lib/openssl/openssl.cnf if no '-config' were used as 'strace -f' has shown.
 export OPENSSL_CONF="$IA_OPENSSL_CNF"
+unset OPENSSL_FIPS=
+unset OPENSSL_DEBUG_MEMORY=
+export OPENSSL_TRACE="TRACE,X509V3_POLICY"
 export SSL_CERT_FILE="/dev/null"
 
 
