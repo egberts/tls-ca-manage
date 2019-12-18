@@ -24,7 +24,7 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
 * Cipher algorithms
   * aes128, aes256, aes-256-cbc, aes-128-cbc, des-ede3-cbc, camellia-256-cbc
 * Encryption algorithms
-  * RSA, ECDSA, ED25519, POLY1305 
+  * RSA, ECDSA, ED25519, POLY1305
 * Encryption bit size
   * 4096, 2048, 1024, 521, 512, 384, 256, 224, 192, 128
  * No root account required (enforces **`ssl-cert`** supplemental group)
@@ -66,7 +66,7 @@ There are OpenSSL encryption options that don't play well with other digest or b
 
 Wait, there's more.
 
-## Nested CA 
+## Nested CA
 File organization for nested CAs also come in two flavors:
 * flat
 * nested-tree
@@ -81,13 +81,32 @@ I too incorporated the new centralized directory layout into this `tls-ca-manage
 All details regarding directory layouts are given here: [CA_DIRECTORY_LAYOUTS](https://github.com/egberts/tls-ca-manage/blob/master/doc/CA_DIRECTORY_LAYOUTS)
 
 # OpenSSL limitation
-Even with a carefully crafted OpenSSL configuration file, it is a hair-pulling experience to use the command line (especially 6-month later when you forget all those little things).   
+Even with a carefully crafted OpenSSL configuration file, it is a hair-pulling experience to use the command line (especially 6-month later when you forget all those little things).
 
 It is so bad that even EasyRSA has a problem staying current with the OpenSSL versions.  I wanted to avoid all that dependency of OpenSSL version (after starting with its v1.1.1, due to introduction of `openssl genpkey` command).
 
+Also, tls-ca-manage/tls-cert-manage cannot mix node type to a single end-node,
+for that would make its end-node too over-privileged.  Make a unique single-type
+'endnode' for each cert type.
+
+This doesn't work:
+    tls-ca-manage.sh create -p root -t root root
+    tls-ca-manage.sh create -p root -t endnode mycompany_intca
+    # splitting a CA into multiple functions (bad)
+    tls-cert-manage.sh create mycompany_servers server mycompany_intca
+    tls-cert-manage.sh create mycompany_emails server mycompany_intca
+
+This works best:
+    tls-ca-manage.sh create -p root -t root root
+    # making an endnode CA into a unique function (good)
+    tls-ca-manage.sh create -p root -t email mycompany_emails
+    tls-ca-manage.sh create -p root -t server mycompany_servers
+    # each cert type has its own CA (good)
+    tls-cert-manage.sh create fred_flintsone email mycompany_emails
+
 
 # Syntax
-So, to make it easy, the syntax is about the CA node itself;  A simple filename for a simple CA node.  
+So, to make it easy, the syntax is about the CA node itself;  A simple filename for a simple CA node.
 
 Coupled that with three basic commands:  Create, renew, and verify.
 
@@ -271,15 +290,15 @@ To create a root CA node, execute:
 $ tls-ca-manage.sh create root
 Create /etc/ssl/ca subdirectory? (Y/n): y
 /etc/ssl/etc/root-ca.cnf file is missing, recreating ...
-Organization (default: 'ACME Networks'): 
-Org. Unit/Section/Division:  (default: 'Trust Division'): 
-Common Name:  (default: 'ACME Internal Root CA A1'): 
-Country (2-char max.):  (default: 'US'): 
-State:  (default: ''): 
-Locality/City:  (default: ''): 
-Contact email:  (default: 'ca.example@example.invalid'): 
-Base URL:  (default: 'https://example.invalid/ca'): 
-CRL URL:  (default: 'http://example.invalid/ca/example-crl.crt'): 
+Organization (default: 'ACME Networks'):
+Org. Unit/Section/Division:  (default: 'Trust Division'):
+Common Name:  (default: 'ACME Internal Root CA A1'):
+Country (2-char max.):  (default: 'US'):
+State:  (default: ''):
+Locality/City:  (default: ''):
+Contact email:  (default: 'ca.example@example.invalid'):
+Base URL:  (default: 'https://example.invalid/ca'):
+CRL URL:  (default: 'http://example.invalid/ca/example-crl.crt'):
 Creating /etc/ssl/etc/root-ca.cnf file...
 Created Parent CA /etc/ssl/etc/root-ca.cnf file
 .....................................................................................................................++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -303,9 +322,9 @@ Certificate Details:
                 Certificate Sign, CRL Sign
             X509v3 Basic Constraints: critical
                 CA:TRUE
-            X509v3 Subject Key Identifier: 
+            X509v3 Subject Key Identifier:
                 58:A9:A1:9B:F0:30:03:9C:A0:7A:71:C0:EE:A7:96:C3:D6:04:EE:DA
-            X509v3 Authority Key Identifier: 
+            X509v3 Authority Key Identifier:
                 58:A9:A1:9B:F0:30:03:9C:A0:7A:71:C0:EE:A7:96:C3:D6:04:EE:DA
 Certificate is to be certified until Nov 15 23:50:16 2029 GMT (3650 days)
 
@@ -332,15 +351,15 @@ To creata an intermediate CA node, execute:
 tls-ca-manage.sh create -p root component
 
 /etc/ssl/etc/component-ca.cnf file is missing, recreating ...
-Organization (default: 'ACME Networks'): 
-Org. Unit/Section/Division:  (default: 'Semi-Trust Department'): 
-Common Name:  (default: 'ACME Internal Intermediate CA B2'): 
-Country (2-char max.):  (default: 'US'): 
-State:  (default: ''): 
-Locality/City:  (default: ''): 
-Contact email:  (default: 'ca.subroot@example.invalid'): 
-Base URL:  (default: 'https://example.invalid/ca/subroot'): 
-CRL URL:  (default: 'https://example.invalid/subroot-ca.crl'): 
+Organization (default: 'ACME Networks'):
+Org. Unit/Section/Division:  (default: 'Semi-Trust Department'):
+Common Name:  (default: 'ACME Internal Intermediate CA B2'):
+Country (2-char max.):  (default: 'US'):
+State:  (default: ''):
+Locality/City:  (default: ''):
+Contact email:  (default: 'ca.subroot@example.invalid'):
+Base URL:  (default: 'https://example.invalid/ca/subroot'):
+CRL URL:  (default: 'https://example.invalid/subroot-ca.crl'):
 Creating /etc/ssl/etc/component-ca.cnf file...
 Created Intermediate CA /etc/ssl/etc/component-ca.cnf file
 ..................................
@@ -365,13 +384,13 @@ Certificate Details:
                 Certificate Sign, CRL Sign
             X509v3 Basic Constraints: critical
                 CA:TRUE, pathlen:0
-            X509v3 Subject Key Identifier: 
+            X509v3 Subject Key Identifier:
                 21:95:BC:6F:6C:BE:2C:8E:1D:66:7A:CC:2B:B1:24:A0:91:71:21:B3
-            X509v3 Authority Key Identifier: 
+            X509v3 Authority Key Identifier:
                 58:A9:A1:9B:F0:30:03:9C:A0:7A:71:C0:EE:A7:96:C3:D6:04:EE:DA
-            Authority Information Access: 
+            Authority Information Access:
                 CA Issuers - URI:https://example.invalid/ca/root-ca.crt
-            X509v3 CRL Distribution Points: 
+            X509v3 CRL Distribution Points:
                 Full Name:
                   URI:https://example.invalid/ca/root-ca.crl
 Certificate is to be certified until Nov 15 23:51:58 2029 GMT (3650 days)
@@ -402,15 +421,15 @@ To add a second Intermediate CA node, execute:
 tls-ca-manage.sh create -p root identity
 
 /etc/ssl/etc/identity-ca.cnf file is missing, recreating ...
-Organization (default: 'ACME Networks'): 
-Org. Unit/Section/Division:  (default: 'Semi-Trust Department'): 
-Common Name:  (default: 'ACME Internal Intermediate CA B2'): 
-Country (2-char max.):  (default: 'US'): 
-State:  (default: ''): 
-Locality/City:  (default: ''): 
-Contact email:  (default: 'ca.subroot@example.invalid'): 
-Base URL:  (default: 'https://example.invalid/ca/subroot'): 
-CRL URL:  (default: 'https://example.invalid/subroot-ca.crl'): 
+Organization (default: 'ACME Networks'):
+Org. Unit/Section/Division:  (default: 'Semi-Trust Department'):
+Common Name:  (default: 'ACME Internal Intermediate CA B2'):
+Country (2-char max.):  (default: 'US'):
+State:  (default: ''):
+Locality/City:  (default: ''):
+Contact email:  (default: 'ca.subroot@example.invalid'):
+Base URL:  (default: 'https://example.invalid/ca/subroot'):
+CRL URL:  (default: 'https://example.invalid/subroot-ca.crl'):
 Creating /etc/ssl/etc/identity-ca.cnf file...
 Created Intermediate CA /etc/ssl/etc/identity-ca.cnf file
 ................................................................................................................................++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -434,13 +453,13 @@ Certificate Details:
                 Certificate Sign, CRL Sign
             X509v3 Basic Constraints: critical
                 CA:TRUE, pathlen:0
-            X509v3 Subject Key Identifier: 
+            X509v3 Subject Key Identifier:
                 97:18:EF:DF:20:04:9E:66:21:BB:0D:59:EB:03:2A:4D:EB:55:98:D2
-            X509v3 Authority Key Identifier: 
+            X509v3 Authority Key Identifier:
                 58:A9:A1:9B:F0:30:03:9C:A0:7A:71:C0:EE:A7:96:C3:D6:04:EE:DA
-            Authority Information Access: 
+            Authority Information Access:
                 CA Issuers - URI:https://example.invalid/ca/root-ca.crt
-            X509v3 CRL Distribution Points: 
+            X509v3 CRL Distribution Points:
                 Full Name:
                   URI:https://example.invalid/ca/root-ca.crl
 Certificate is to be certified until Nov 15 23:54:33 2029 GMT (3650 days)
@@ -471,15 +490,15 @@ Successfully completed; exiting...
 tls-ca-manage.sh -a ecdsa -k 521 create -p root security
 
 /etc/ssl/etc/security-ca.cnf file is missing, recreating ...
-Organization (default: 'ACME Networks'): 
-Org. Unit/Section/Division:  (default: 'Semi-Trust Department'): 
-Common Name:  (default: 'ACME Internal Intermediate CA B2'): 
-Country (2-char max.):  (default: 'US'): 
-State:  (default: ''): 
-Locality/City:  (default: ''): 
-Contact email:  (default: 'ca.subroot@example.invalid'): 
-Base URL:  (default: 'https://example.invalid/ca/subroot'): 
-CRL URL:  (default: 'https://example.invalid/subroot-ca.crl'): 
+Organization (default: 'ACME Networks'):
+Org. Unit/Section/Division:  (default: 'Semi-Trust Department'):
+Common Name:  (default: 'ACME Internal Intermediate CA B2'):
+Country (2-char max.):  (default: 'US'):
+State:  (default: ''):
+Locality/City:  (default: ''):
+Contact email:  (default: 'ca.subroot@example.invalid'):
+Base URL:  (default: 'https://example.invalid/ca/subroot'):
+CRL URL:  (default: 'https://example.invalid/subroot-ca.crl'):
 Creating /etc/ssl/etc/security-ca.cnf file...
 Created Intermediate CA /etc/ssl/etc/security-ca.cnf file
 Creating Intermediate CA certificate ...
@@ -501,13 +520,13 @@ Certificate Details:
                 Certificate Sign, CRL Sign
             X509v3 Basic Constraints: critical
                 CA:TRUE, pathlen:0
-            X509v3 Subject Key Identifier: 
+            X509v3 Subject Key Identifier:
                 EC:76:73:6E:10:EC:C9:FC:DC:00:32:90:EE:06:B9:AC:5C:49:AE:19
-            X509v3 Authority Key Identifier: 
+            X509v3 Authority Key Identifier:
                 58:A9:A1:9B:F0:30:03:9C:A0:7A:71:C0:EE:A7:96:C3:D6:04:EE:DA
-            Authority Information Access: 
+            Authority Information Access:
                 CA Issuers - URI:https://example.invalid/ca/root-ca.crt
-            X509v3 CRL Distribution Points: 
+            X509v3 CRL Distribution Points:
                 Full Name:
                   URI:https://example.invalid/ca/root-ca.crl
 Certificate is to be certified until Nov 15 23:59:10 2029 GMT (3650 days)
@@ -565,13 +584,13 @@ Certificate:
                 Certificate Sign, CRL Sign
             X509v3 Basic Constraints: critical
                 CA:TRUE, pathlen:0
-            X509v3 Subject Key Identifier: 
+            X509v3 Subject Key Identifier:
                 EC:76:73:6E:10:EC:C9:FC:DC:00:32:90:EE:06:B9:AC:5C:49:AE:19
-            X509v3 Authority Key Identifier: 
+            X509v3 Authority Key Identifier:
                 58:A9:A1:9B:F0:30:03:9C:A0:7A:71:C0:EE:A7:96:C3:D6:04:EE:DA
-            Authority Information Access: 
+            Authority Information Access:
                 CA Issuers - URI:https://example.invalid/ca/root-ca.crt
-            X509v3 CRL Distribution Points: 
+            X509v3 CRL Distribution Points:
                 Full Name:
                   URI:https://example.invalid/ca/root-ca.crl
     Signature Algorithm: sha256WithRSAEncryption

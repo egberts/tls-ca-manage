@@ -56,6 +56,7 @@ cert_opt = < compatible | ca_default | no_header | no_version |
         ext_parse | ext_dump>
 copy_extensions = <none|copy|copyall>
 new_certs_dir = <dirspec>
+database? = <filespec>
 default_md = <'default'|'sha256'|'sha128'|'ssl3-md5'|'ssl3-sha1'>
 email_in_dn = <'no'|email_address>
 default_email_in_dn = <'no'|email_address>

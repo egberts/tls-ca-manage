@@ -1,5 +1,8 @@
 #!/bin/bash
 #
+# TODO: Add:
+#     CNF_REQ_EXT_PROMPT = yes  to email
+#
 # NAME
 #     tls-cert-manage.sh - Manage Root and Intermediate Certificate Authorities
 #
@@ -29,6 +32,7 @@
 #          encryption   - Microsoft Encrypted File System (msEFS)
 #          codesign     - Signed executable code
 #          timestamping - ANSI X9.95 TimeStamping (RFC3161)
+#          proxy        - Used for proxying
 #
 #        This argument is used only with 'create' command line option
 #
@@ -151,6 +155,7 @@ function cmd_show_syntax_usage {
         [ --cipher < > ]
         [ --group|-g <group-name> ]  # (default: $DEFAULT_GROUP_NAME)
         [ --traditional|-T ]
+        [ --dry-run|-d ]
 
 <ca-type>: server, client, email, ocsp, timestamping, security, codesign
 
@@ -178,7 +183,7 @@ DEFAULT_PEER_SIGNATURE="rsa"
 DEFAULT_SERIAL_ID_HEX=1000
 DEFAULT_SSL_DIR="/etc/ssl"
 DEFAULT_VERBOSITY=0
-DEFAULT_DRYRUN=0
+DEFAULT_DRY_RUN=
 DEFAULT_USER_NAME=${USER}  # tells most IDE syntax checker to say that $USER is defined
 # No DEFAULT_ROOT_CA_NAME
 # DEFAULT_INT_CA_NAME="network"
@@ -317,7 +322,7 @@ function directory_file_layout {
         PARENT_IA_DIR="$SSL_CA_DIR/$PARENT_IA_PATH_FNAME"
     elif [[ "$OFSTD_DIR_TREE_TYPE" == "hierarchy" ]]; then
         # Inspired by traditional OpenSSL
-        CERT_FNAME="${FILENAME_PREFIX}${CERT_NAME}${FILENAME_SUFFIX}"
+        CERT_FNAME="${CERT_FILENAME_PREFIX}${CERT_NAME}${CERT_FILENAME_SUFFIX}"
         CERT_SNAME="${X509_PREFIX}${CERT_NAME}${X509_SUFFIX}"
         CERT_PATH_FNAME="${DIRNAME_PREFIX}${CERT_NAME}${DIRNAME_SUFFIX}"
 
@@ -366,10 +371,10 @@ function directory_file_layout {
         PARENT_IA_SERIAL_DB_DIR="$PARENT_IA_DB_DIR"
         PARENT_IA_CRL_DB_DIR="$PARENT_IA_DB_DIR"
 
-        CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/certificate_request-${CERT_CA_TYPE}-${CERT_FNAME}.cnf"
-        CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/certificate_request_extension-${PARENT_IA_FNAME}-${CERT_FNAME}.cnf"
+        CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/${CERT_NODE_TYPE}_${CERT_FNAME}_${PARENT_IA_FNAME}_req.cnf"
+        CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/${CERT_NODE_TYPE}_${CERT_FNAME}_${PARENT_IA_FNAME}_reqext.cnf"
         PARENT_IA_OPENSSL_CNF_CA_FILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}.cnf"
-        PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$PARENT_IA_EXT_DIR/certificate_ca_extension-${CERT_CA_TYPE}-${CERT_FNAME}.cnf"
+        PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}_${CERT_NODE_TYPE}-${CERT_FNAME}_ext.cnf"
     else
         CERT_EXT_DIR="$DFL_SSL_DIR/etc"
         CERT_CRL_DIR="$DFL_SSL_DIR/$CRL_DNAME"
@@ -395,10 +400,10 @@ function directory_file_layout {
         PARENT_IA_SERIAL_DB_DIR="$PARENT_IA_DIR/$CERT_DB_DNAME"
         PARENT_IA_CRL_DB_DIR="$PARENT_IA_DIR/$CERT_DB_DNAME"
 
-        CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/certificate_request-${CERT_CA_TYPE}-${CERT_FNAME}.cnf"
-        CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/certificate_request_extension-${PARENT_IA_FNAME}-${CERT_FNAME}.cnf"
+        CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/${CERT_NODE_TYPE}_${CERT_FNAME}_${PARENT_IA_FNAME}_req.cnf"
+        CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/${CERT_NODE_TYPE}_${CERT_FNAME}_${PARENT_IA_FNAME}_reqext.cnf"
         PARENT_IA_OPENSSL_CNF_CA_FILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}.cnf"
-        PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$PARENT_IA_EXT_DIR/certificate_ca_extension-${CERT_CA_TYPE}-${CERT_FNAME}.cnf"
+        PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}_${CERT_NODE_TYPE}-${CERT_FNAME}_ext.cnf"
     fi
 
     if [[ "$VERBOSITY" -gt 1 ]]; then
@@ -438,38 +443,43 @@ function directory_file_layout {
         CHAIN_FILENAME_MID=".chain"
         CHAIN_FILETYPE_SUFFIX=".pem"
         # CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$CHAIN_FILENAME_MID$CHAIN_FILENAME_SUFFIX"
-        CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$FILENAME_SUFFIX$CHAIN_FILENAME_MID"
+        CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$CERT_FILENAME_SUFFIX$CHAIN_FILENAME_MID"
 
         CERT_KEY_FNAME="${KEY_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
         PARENT_IA_KEY_FNAME="${PARENT_IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
     else
-        FFNAME_KEY="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_KEY"  # '-ca.key'
-        FFNAME_CSR="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CSR"  # '-ca.csr'
-        FFNAME_CERT="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CERT"  # '-ca.crt'
-        FFNAME_CRL="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CRL"  # '-ca.crl'
+        CERT_FFNAME_KEY="$CERT_FILENAME_SUFFIX.$DEFAULT_FILETYPE_KEY"  # '-ca.key'
+        CERT_FFNAME_CSR="$CERT_FILENAME_SUFFIX.$DEFAULT_FILETYPE_CSR"  # '-ca.csr'
+        CERT_FFNAME_CERT="$CERT_FILENAME_SUFFIX.$DEFAULT_FILETYPE_CERT"  # '-ca.crt'
+        CERT_FFNAME_CRL="$CERT_FILENAME_SUFFIX.$DEFAULT_FILETYPE_CRL"  # '-ca.crl'
 
-        PARENT_IA_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_KEY"
-        KEY_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$FFNAME_KEY"
+        PARENT_IA_FFNAME_KEY="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_KEY"  # '-ca.key'
+        PARENT_IA_FFNAME_CSR="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CSR"  # '-ca.csr'
+        PARENT_IA_FFNAME_CERT="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CERT"  # '-ca.crt'
+        PARENT_IA_FFNAME_CRL="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CRL"  # '-ca.crl'
 
-        CSR_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$FFNAME_CSR"
-        CRL_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$FFNAME_CRL"
+        PARENT_IA_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$PARENT_IA_FFNAME_KEY"
+        KEY_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$CERT_FFNAME_KEY"
 
-        CERT_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$FFNAME_CERT"
-        PARENT_CERT_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CERT"
+        CSR_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$CERT_FFNAME_CSR"
+        CRL_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$CERT_FFNAME_CRL"
+
+        CERT_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$CERT_FFNAME_CERT"
+        PARENT_CERT_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$PARENT_IA_FFNAME_CERT"
 
         CERT_KEY_FNAME="${KEY_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
-        CERT_SERIAL_FNAME="$FILENAME_PREFIX$CERT_NAME$FFNAME_CERT.srl"
-        CERT_INDEX_FNAME="$FILENAME_PREFIX$CERT_NAME$FILENAME_SUFFIX.$DB_DNAME"
-        CERT_CRLNUMBER_FNAME="$FILENAME_PREFIX$CERT_NAME$FFNAME_CRL.srl"
+        # CERT_SERIAL_FNAME="$FILENAME_PREFIX$CERT_NAME$FFNAME_CERT.srl"
+        # CERT_INDEX_FNAME="$FILENAME_PREFIX$CERT_NAME$CERT_FILENAME_SUFFIX.$DB_DNAME"
+        # CERT_CRLNUMBER_FNAME="$FILENAME_PREFIX$CERT_NAME$FFNAME_CRL.srl"
 
         CHAIN_FILENAME_MID="-chain"
         CHAIN_FILETYPE_SUFFIX=".pem"
-        CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$CERT_NAME$FILENAME_SUFFIX$CHAIN_FILENAME_MID"
+        CHAIN_FNAME_PREFIX="$CERT_FILENAME_PREFIX$CERT_NAME$CERT_FILENAME_SUFFIX$CHAIN_FILENAME_MID"
 
         PARENT_IA_KEY_FNAME="${PARENT_IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
-        PARENT_IA_SERIAL_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CRL.srl"
+        PARENT_IA_SERIAL_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$PARENT_IA_FFNAME_CRL.srl"
         PARENT_IA_INDEX_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX.$DB_DNAME"
-        PARENT_IA_CRLNUMBER_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CRL.srl"
+        PARENT_IA_CRLNUMBER_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$CERT_FFNAME_CRL.srl"
     fi
 
     CERT_CSR_FNAME="${CSR_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
@@ -614,8 +624,6 @@ function get_x509v3_extension_by_cert_type {
   fi
   case "$GXEBCT_CA_TYPE" in
     server)
-      CNF_SECTION_REQ_EXT="section_server_req_x509v3_extension"
-      CNF_SECTION_CA_EXT="section_server_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"
       CNF_REQ_EXT_BC="CA:false"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -630,21 +638,21 @@ function get_x509v3_extension_by_cert_type {
       # CNF_REQ_EXT_AIA="@ocsp_info"
       # CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_AIA=""
-      CNF_SECTION_CA_EXT="section_server_ca_x509v3_extension"
+      # signing-ca.cnf/[server_ext]
+      # email-ca.cnf/[server_ext]
       CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
       CNF_CA_EXT_BC="CA:false"
       CNF_CA_EXT_SKI="hash"
-      CNF_CA_EXT_AKI="keyid:always"
-      CNF_CA_EXT_AIA="@ocsp_info"
-      CNF_CA_EXT_EKU="serverAuth"  # No 'clientAuth' allowed
+      CNF_CA_EXT_AKI="keyid,issuer:always"
+      CNF_CA_EXT_AIA=""  # no need for OCSP nor Issuer info here
+      CNF_CA_EXT_EKU="serverAuth"
       # Only need serverAuth & clientAuth together if
       #   making a PEM key that combines private and public key (bad idea)
-      CNF_CA_EXT_SAN=""
+      # CNF_CA_EXT_SAN="\$ENV::SAN"  # subjectAltName
+      CNF_CA_EXT_AIA="@issuer_info"
+      ###
       ;;
     client)
-      CNF_SECTION_REQ_EXT="section_client_req_x509v3_extension"
-      CNF_SECTION_CA_EXT="section_client_ca_x509v3_extension"
-      # CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"  # very old
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -652,10 +660,16 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="clientAuth"
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
+      # email-ca.cnf/[client_ext]
+      CNF_CA_EXT_KU="critical,digitalSignature"
+      CNF_CA_EXT_BC="CA:false"
+      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+      CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+      CNF_CA_EXT_EKU="clientAuth"
+      CNF_CA_EXT_SAN="email:move"  # subjectAltName
+      CNF_CA_EXT_AIA="@issuer_info"
       ;;
     timestamping)
-      CNF_SECTION_REQ_EXT="section_timestamping_req_x509v3_extension"
-      CNF_SECTION_CA_EXT="section_timestamping_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -665,8 +679,6 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_AIA="@issuer_info"
       ;;
     ocsp)
-      CNF_SECTION_REQ_EXT="section_ocspsign_req_x509v3_extension"
-      CNF_SECTION_CA_EXT="section_ocspsign_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -674,22 +686,35 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="critical,OCSPSigning"
       CNF_REQ_EXT_SAN=""  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
+      CNF_CA_EXT_KU="critical,digitalSignature"
+      CNF_CA_EXT_BC="CA:false"
+      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+      CNF_CA_EXT_AKI="keyid,issuer"  # authorityKeyIdentifier
+      CNF_CA_EXT_EKU="critical,OCSPSigning"
+      CNF_CA_EXT_SAN=""  # subjectAltName
+      CNF_CA_EXT_AIA=""
       CNF_CA_EXT_EXTRA="noCheck = null"
       ;;
     email)
-      CNF_SECTION_REQ_EXT="section_email_req_x509v3_extensions"
-      CNF_SECTION_CA_EXT="section_email_ca_x509v3_extensions"
       CNF_REQ_EXT_KU="critical,keyEncipherment"
       CNF_REQ_EXT_BC="CA:false"  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      CNF_REQ_EXT_EKU="emailProtection"
+      CNF_REQ_EXT_AKI=""  # authorityKeyIdentifier
+      CNF_REQ_EXT_EKU="emailProtection,clientAuth"
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
+      # signing-ca.cnf/[email_ext]
+      # email-ca.cnf/[email_ext]
+      CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
+      CNF_CA_EXT_BC="CA:false"  # basicConstraint
+      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+      CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+      CNF_CA_EXT_EKU="emailProtection,clientAuth,anyExtendedKeyUsage"
+      CNF_CA_EXT_SAN=""  # subjectAltName
+      CNF_CA_EXT_AIA="@issuer_info"
     ;;
+    # encryption supports 802.1ar, Microsoft Encrypted File System
     encryption)
-      CNF_SECTION_REQ_EXT="section_encryption_req_x509v3_extension"
-      CNF_SECTION_CA_EXT="section_encryption_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"  # keyUsage
       CNF_REQ_EXT_BC=""  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -702,8 +727,6 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_AIA="@issuer_info"
       ;;
     identity)  # there's identity-ca and identity, this here is identity-ca
-      CNF_SECTION_REQ_EXT="section_identity_req_x509v3_extension"
-      CNF_SECTION_CA_EXT="section_identity_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -714,8 +737,6 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_AIA="@issuer_info"
       ;;
     codesign)
-      CNF_SECTION_REQ_EXT="section_codesign_req_x509v3_extension"
-      CNF_SECTION_CA_EXT="section_codesign_ca_x509v3_extension"
       CNF_REQ_EXT_KU="critical,digitalSignature"
       CNF_REQ_EXT_BC="CA:false"  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -723,6 +744,14 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="critical,codeSigning"
       CNF_REQ_EXT_SAN=""  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"  # authorityInfoAccess
+      # software-ca.cnf/[codesign_ext]
+      CNF_CA_EXT_KU="critical,digitalSignature"
+      CNF_CA_EXT_BC="CA:false"  # basicConstraint
+      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+      CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+      CNF_CA_EXT_EKU="critical,codeSigning"
+      CNF_CA_EXT_SAN=""  # subjectAltName
+      CNF_CA_EXT_AIA="@issuer_info"  # authorityInfoAccess
       ;;
     *)
       echo "Invalid '$GXEBCT_CA_TYPE' option"
@@ -756,7 +785,7 @@ function create_generic_cert_req_config_file
   echo """#
 # File: $CGCRCF_CNFFILE
 # Created on: $CGCRCF_CURRENT_TIMESTAMP
-# Generated by: $0
+# Generated by: $0/create_generic_cert_req_config_file()
 #
 # Description:
 #    Create generic Certificate Request main configuration file.
@@ -782,6 +811,13 @@ function create_generic_cert_req_config_file
 #    ${PARENT_IA_NAME}: Parent CA's config file
 #    ${CERT_NAME}:    this node
 #
+[ default ]
+SAN                     = DNS:example.invalid
+base_url                = ${X509_URL_BASE}        # CA base URL
+aia_url                 = ${X509_URL_BASE}/${IA_CERT_FNAME}     # CA certificate URL
+crl_url                 = ${X509_URL_BASE}/${IA_CRL_FNAME}     # CRL distribution point
+ocsp_url                = ${X509_URL_BASE}/ocsp
+
 [ req ]
 default_bits            = $KEYSIZE_BITS         # RSA key size
 encrypt_key             = yes                   # Protect private key
@@ -789,10 +825,10 @@ default_md              = $MESSAGE_DIGEST       # MD to use
 utf8                    = yes                   # Input is UTF-8
 string_mask             = utf8only              # Emit UTF-8 strings
 prompt                  = yes                   # Prompt for DN
-distinguished_name      = ${CA_TYPE}_dn         # DN template
+distinguished_name      = ${NODE_TYPE}_dn         # DN template
 req_extensions          = $CGCRCF_SECTION_NAME     # Desired extensions
 
-[ ${CA_TYPE}_dn ]
+[ ${NODE_TYPE}_dn ]
 countryName               = Country Name (2-letter code)
 countryName_default       = \"$X509_COUNTRY\"
 countryName_min           = 2
@@ -824,9 +860,9 @@ emailAddress_max                = 64
 # domainComponent is not used by 'identity.conf'
 0.domainComponent               = \"Top-level Domain Name (i.e., com, net, org)\"
 0.domainComponent_default       = \"invalid\"
-1.domainComponent               = \"The Domain Name (i.e., example, test, acme)\"\
+1.domainComponent               = \"The Domain Name (i.e., example, test, acme)\"
 1.domainComponent_default       = \"example\"
-2.domainComponent               = \"Sub-Domain Name (i.e., www, ocsp, or 'blank')\"\
+2.domainComponent               = \"Sub-Domain Name (i.e., www, ocsp, or 'blank')\"
 2.domainComponent_default       = \"\"
 
 [ $CGCRCF_SECTION_NAME ]
@@ -840,7 +876,21 @@ emailAddress_max                = 64
     write_line_or_no "authorityInfoAccess"    "$CNF_REQ_EXT_AIA" "$CGCRCF_CNFFILE"
     write_line_or_no "crlDistributionPoint"   "" "$CGCRCF_CNFFILE"
     echo "$CNF_CA_EXT_EXTRA" >> "$CGCRCF_CNFFILE"
+    echo "#
+[ crl_ext ]
+authorityKeyIdentifier  = keyid:always
+authorityInfoAccess     = @issuer_info
 
+[ ocsp_info ]
+caIssuers;URI.0         = \$aia_url
+OCSP;URI.0              = \$ocsp_url
+
+[ issuer_info ]
+caIssuers;URI.0         = \$aia_url
+
+[ crl_info ]
+URI.0                   = \$crl_url
+    """ >> "$CGCRCF_CNFFILE"
     unset CIC_SECTION_NAME
     unset CIC_CONFIG_FILESPEC
     unset CIC_TIMESTAMP
@@ -858,7 +908,7 @@ function create_generic_ca_extension_config_file
   echo """#
 # File: $CCEC_EXTFILE
 # Created on: $CCEC_CURRENT_TIMESTAMP
-# Generated by: $0
+# Generated by: $0/create_generic_ca_extension_config_file()
 #
 # Description:
 #    Generic CA certificate extension configuration file.
@@ -886,12 +936,12 @@ function create_generic_ca_extension_config_file
 #
 
 
-base_url                = ${X509_BASE}        # CA base URL
-aia_url                 = ${X509_BASE}/${IA_CERT_FNAME}     # CA certificate URL
-crl_url                 = ${X509_BASE}/${IA_CRL_FNAME}     # CRL distribution point
-ocsp_url                = ${X509_BASE}/ocsp
+base_url                = ${X509_URL_BASE}        # CA base URL
+aia_url                 = ${X509_URL_BASE}/${CERT_FNAME}     # CA certificate URL
+crl_url                 = ${X509_URL_BASE}/${IA_CRL_FNAME}     # CRL distribution point
+ocsp_url                = ${X509_URL_BASE}/ocsp
 
-# Section name could be a simple ${CA_TYPE} name
+# Section name could be a simple ${NODE_TYPE} name
 # But having CA_TYPE-CA_NAME makes it possible to support
 # different class of the same CA-TYPE by using CA_NAMe as a unique label
 [ $CCEC_SECTION_NAME ]
@@ -943,7 +993,7 @@ function cert_create_public_key
     touch_cert_file "$CERT_KEY_PEM"
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CERT_KEY_PEM"
 
-    ${OPENSSL_GENPKEY} \
+    ${DRY_RUN} ${OPENSSL_GENPKEY} \
         ${OPENSSL_ALGORITHM} \
         -text \
         -outform PEM \
@@ -954,11 +1004,13 @@ function cert_create_public_key
         echo "Error $RETSTS in 'openssl genpkey'; aborting..."
         exit ${RETSTS}
     fi
-    if [[ ! -f "$CERT_KEY_PEM" ]]; then
-        echo "Failed to create private key for $CERT_CA_TYPE ($CERT_KEY_PEM)"
-        exit 126 # ENOKEY
+    if [[ -z "$DRY_RUN" ]]; then
+        if [[ ! -f "$CERT_KEY_PEM" ]]; then
+            echo "Failed to create private key for $CERT_NODE_TYPE ($CERT_KEY_PEM)"
+            exit 126 # ENOKEY
+        fi
+        change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CERT_KEY_PEM"
     fi
-    change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CERT_KEY_PEM"
 
     if [[ ${VERBOSITY} -ne 0 ]]; then
         # View the private key in readable format
@@ -982,10 +1034,11 @@ function cert_create_csr
     CCC_CERT_CONFIG_FILESPEC=$2
     CCC_CERT_CONFIG_EXT_FILESPEC=$3
 
-    ${OPENSSL} req -config "${CCC_CERT_CONFIG_FILESPEC}" \
+    # Do not use -keyout, we have cert_create_public_key() function for that
+    ${DRY_RUN} ${OPENSSL} req -config "${CCC_CERT_CONFIG_FILESPEC}" \
         -reqexts "$CCC_SECTION_NAME" \
         -new \
-        -keyout "$CERT_KEY_PEM" \
+        -key "$CERT_KEY_PEM" \
         "$MESSAGE_DIGEST_CMDOPT" \
         -out "$CERT_CSR_PEM"
     RETSTS=$?
@@ -993,11 +1046,13 @@ function cert_create_csr
         echo "Error $RETSTS in 'openssl req'; aborting..."
         exit ${RETSTS}
     fi
-    if [[ ! -f "$CERT_CSR_PEM" ]]; then
-        echo "Failed to create signing request for $CERT_CA_TYPE ($CERT_CSR_PEM)"
-        exit 2 # ENOENT
+    if [[ -z "$DRY_RUN" ]]; then
+        if [[ ! -f "$CERT_CSR_PEM" ]]; then
+            echo "Failed to create signing request for $CERT_NODE_TYPE ($CERT_CSR_PEM)"
+            exit 2 # ENOENT
+        fi
+        change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CERT_CSR_PEM"
     fi
-    change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CERT_CSR_PEM"
 
     if [[ ${VERBOSITY} -ne 0 ]]; then
         # View the CSR in readable format
@@ -1013,11 +1068,11 @@ function cert_create_csr
 # Parent CA accept CA node's CSR by trusting  #
 ###############################################
 function cert_create_certificate {
-    echo "Creating '$CERT_CA_TYPE'-type certificate ..."
+    echo "Creating $CERT_NAME ($NODE_TYPE) certificate ..."
     CCC_CERT_OPENSSL_CNF_EXTENSION="$1"
     CCC_CERT_OPENSSL_CNF_EXTFILE="$2"
     CCC_CERT_SECTION_NAME="$3"
-    ${OPENSSL_CA} \
+    ${DRY_RUN} ${OPENSSL_CA} \
         -batch \
         ${IA_OPENSSL_CA_OPT} \
         -extfile "$CCC_CERT_OPENSSL_CNF_EXTFILE" \
@@ -1032,7 +1087,13 @@ function cert_create_certificate {
         echo "Error $RETSTS in 'openssl ca'"
         exit ${RETSTS}
     fi
-    change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CERT_CERT_PEM"
+    if [[ -z "$DRY_RUN" ]]; then
+        if [[ ! -f "$CERT_CERT_PEM" ]]; then
+            echo "Failed to create certificate for $CERT_NODE_TYPE ($CERT_CERT_PEM)"
+            exit 2 # ENOENT
+        fi
+        change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CERT_CERT_PEM"
+    fi
 
     unset CCC_CERT_OPENSSL_CNF_EXTFILE
     unset CCC_CERT_OPENSSL_CNF_EXTENSION
@@ -1041,8 +1102,8 @@ function cert_create_certificate {
 
 function cert_create_revocation_list
 {
-    echo "Creating $CERT_CA_TYPE certificate revocation list (CRL)..."
-    ${OPENSSL_CA} \
+    echo "Creating $CERT_NODE_TYPE certificate revocation list (CRL)..."
+    ${DRY_RUN} ${OPENSSL_CA} \
         -gencrl \
         -config "$PARENT_IA_OPENSSL_CNF_CA_FILE" \
         -out "$CERT_CRL_PEM"
@@ -1055,7 +1116,7 @@ function ca_extract_signing_request
     ###########################################################
     # We are at the mercy of CA_CERT_PEM being the latest
     # and ALSO in its index.txt file as well.
-    ${OPENSSL_X509} -x509toreq \
+    ${DRY_RUN} ${OPENSSL_X509} -x509toreq \
        -in "$CERT_CERT_PEM" \
        -signkey "$CERT_KEY_PEM" \
        -out "$CERT_CSR_PEM"
@@ -1065,7 +1126,7 @@ function ca_extract_signing_request
         exit ${RETSTS}
     fi
     if [[ ! -f "$CERT_CSR_PEM" ]]; then
-        echo "Failed to recreate request key from $CERT_CA_TYPE ($CERT_CSR_PEM)"
+        echo "Failed to recreate request key from $CERT_NODE_TYPE ($CERT_CSR_PEM)"
         exit 2 #ENOENT
     fi
     if [[ ${VERBOSITY} -ne 0 ]]; then
@@ -1082,7 +1143,7 @@ function ca_renew_certificate
     CRC_CERT_OPENSSL_CNF_EXTFILE="$1"
     CRC_CERT_OPENSSL_CNF_EXTENSION="$2"
     # DO NOT USE 'openssl x509', because it lacks DB accounting
-    ${OPENSSL_CA} \
+    ${DRY_RUN} ${OPENSSL_CA} \
         -verbose \
         ${IA_OPENSSL_CA_OPT} \
         -extfile "${CRC_CERT_OPENSSL_CNF_EXTFILE}" \
@@ -1096,9 +1157,11 @@ function ca_renew_certificate
         echo "Error $RETSTS in 'openssl ca'; aborting..."
         exit ${RETSTS}
     fi
-    if [[ ! -f "$CERT_CERT_PEM" ]]; then
-        echo "Failed to recreate $CERT_CA_TYPE certificate ($CERT_CERT_PEM}"
-        exit 2 # ENOENT
+    if [[ -z "$DRY_RUN" ]]; then
+        if [[ ! -f "$CERT_CERT_PEM" ]]; then
+            echo "Failed to recreate $CERT_NODE_TYPE certificate ($CERT_CERT_PEM}"
+            exit 2 # ENOENT
+        fi
     fi
     unset CRC_CERT_OPENSSL_CNF_EXTFILE
     unset CRC_CERT_OPENSSL_CNF_EXTENSION
@@ -1122,43 +1185,49 @@ function display_cert_certificate {
     echo "$(${OPENSSL_X509} -noout -modulus -in "$DCC_THIS_PEM" | ${OPENSSL_MD5}) $DCC_THIS_PEM"
 
     if [[ ${VERBOSITY} -ne 0 ]]; then
-        echo "Decoding $CERT_CA_TYPE certificate:"
+        echo "Decoding $CERT_NODE_TYPE certificate:"
         ${OPENSSL_X509} -in "$DCC_THIS_PEM" -noout -text
     else
-        echo "To see decoded $CERT_CA_TYPE certificate, execute:"
+        echo "To see decoded $CERT_NODE_TYPE certificate, execute:"
         echo "  $OPENSSL_X509 -in $DCC_THIS_PEM -noout -text"
     fi
 }
 
 function delete_any_old_cert_files {
     # Yeah, yeah, yeah; destructive but this is a new infrastructure
-    if [[ -d "$CERT_CERTS_DIR" ]]; then
-        echo "DEBUG: DEBUG: CERTS_DIR: $CERT_CERTS_DIR exist..."
-        echo -n "Asking again: Do you want to selectively-delete $CERT_CERTS_DIR? (N/yes): "
+    if [[ -d "$CERT_KEY_PEM" ]]; then
+        echo "DEBUG: DEBUG: CERTS_DIR: $CERT_KEY_PEM exist..."
+        echo -n "Asking again: Do you want to selectively-delete $CERT_KEY_PEM? (N/yes): "
         read -r DELETE_CERT_DIR
         if [[ "$DELETE_CERT_DIR" =~ y|yes|Y|YES ]]; then
             delete_cert_dirfiles
         else
             echo "Exiting..."; exit 1
         fi
-    else
-        echo "WHOA! Directory $CERT_CERTS_DIR does not exist."
-        exit 1
     fi
     [[ ${FORCE_DELETE_CONFIG} -eq 1 ]] && delete_cert_config
 }
 
+function get_section_names
+{
+    GSN_NODE_TYPE="$1"
+    GSN_PARENT_IA_NAME="$2"
+    SECTION_NAME_REQ="${GSN_NODE_TYPE}_${GSN_PARENT_IA_NAME}_reqext"
+    SECTION_NAME_CA="${GSN_NODE_TYPE}_${GSN_PARENT_IA_NAME}_ext"
+    unset GSN_NODE_TYPE
+    unset GSN_PARENT_IA_NAME
+}
 
 ##################################################
 # CLI create command                             #
 ##################################################
 function cmd_create_cert {
-    [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $CERT_CA_TYPE certificate..."
+    [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $CERT_NODE_TYPE certificate..."
 
     delete_any_old_cert_files
 
     if [[ ${VERBOSITY} -ne 0 ]]; then
-        echo "$CERT_CA_TYPE subdirectory:  $(ls -1lad "$SSL_CA_DIR"/)"
+        echo "$CERT_NODE_TYPE subdirectory:  $(ls -1lad "$SSL_CA_DIR"/)"
     fi
 
     cd "$SSL_CA_DIR" || exit 65  # ENOPKG
@@ -1176,27 +1245,28 @@ function cmd_create_cert {
         data_entry_generic
     fi
 
-    [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $CERT_CA_TYPE private key ..."
+    [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $CERT_NODE_TYPE private key ..."
 
-    echo "DEBUG: DEBUG: CA_TYPE: $CA_TYPE"
-    get_x509v3_extension_by_cert_type "$CA_TYPE" -1
+    echo "DEBUG: DEBUG: CA_TYPE: $NODE_TYPE"
+    get_x509v3_extension_by_cert_type "$NODE_TYPE" -1
 
-    create_generic_cert_req_config_file "$CNF_SECTION_REQ_EXT" "$CERT_OPENSSL_CNF_REQ_FILE"
+    get_section_names "${NODE_TYPE}" "${PARENT_IA_NAME}"
 
-    SECTION_CA="req_extension_${PARENT_IA_NAME}_${CA_TYPE}"
-    create_generic_ca_extension_config_file "$SECTION_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
+    create_generic_cert_req_config_file "$SECTION_NAME_REQ" "$CERT_OPENSSL_CNF_REQ_FILE"
+
+    create_generic_ca_extension_config_file "$SECTION_NAME_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
 
     cert_create_public_key
 
     # Create PKCS#10 (Certificate Signing Request)
-    cert_create_csr "$CNF_SECTION_REQ_EXT" \
+    cert_create_csr "$SECTION_NAME_REQ" \
         "$CERT_OPENSSL_CNF_REQ_FILE" \
         "$CERT_OPENSSL_CNF_REQ_EXTFILE"
 
     cert_create_certificate \
         "$PARENT_IA_OPENSSL_CNF_CA_FILE" \
         "$PARENT_IA_OPENSSL_CNF_CA_EXTFILE" \
-        "$SECTION_CA"
+        "$SECTION_NAME_CA"
 
     cert_create_revocation_list
 
@@ -1217,11 +1287,11 @@ function cmd_create_cert {
     display_cert_certificate "$CERT_CERT_PEM"
 
     echo "Created the following files:"
-    echo "  $CERT_CA_TYPE cert req   : $CERT_CSR_PEM"
-    echo "  $CERT_CA_TYPE certificate: $CERT_CERT_PEM"
-    echo "  $CERT_CA_TYPE private key: $CERT_KEY_PEM"
-    echo "  $CERT_CA_TYPE new cert   : $PARENT_IA_NEWCERTS_ARCHIVE_DIR"
-    echo "  $CERT_CA_TYPE CRL        : $CERT_CRL_PEM"
+    echo "  $CERT_NODE_TYPE cert req   : $CERT_CSR_PEM"
+    echo "  $CERT_NODE_TYPE certificate: $CERT_CERT_PEM"
+    echo "  $CERT_NODE_TYPE private key: $CERT_KEY_PEM"
+    echo "  $CERT_NODE_TYPE new cert   : $PARENT_IA_NEWCERTS_ARCHIVE_DIR"
+    echo "  $CERT_NODE_TYPE CRL        : $CERT_CRL_PEM"
 }
 
 
@@ -1273,28 +1343,30 @@ function cmd_renew_cert {
 
     ca_extract_signing_request
 
-    echo "DEBUG: DEBUG: CA_TYPE: $CA_TYPE"
-    get_x509v3_extension_by_cert_type "$CA_TYPE" -1
+    echo "DEBUG: DEBUG: CA_TYPE: $NODE_TYPE"
+    get_x509v3_extension_by_cert_type "$NODE_TYPE" -1
+    get_section_names "${NODE_TYPE}" "${PARENT_IA_NAME}"
 
-    create_internode_config "ca" "$THIS_SECTION" "$PARENT_IA_OPENSSL_CNF_CA_EXTFILE"
+    # REQ config file should already be created (could pre-exist-check for one here)
+    create_generic_ca_extension_config_file "$SECTION_NAME_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
 
-    ca_renew_certificate "$CERT_OPENSSL_CNF_REQ_EXTFILE" "$THIS_SECTION"
+    ca_renew_certificate "$CERT_OPENSSL_CNF_REQ_EXTFILE" "$SECTION_NAME_REQ"
 
     cert_create_revocation_list
 
     display_cert_certificate "$CERT_CERT_PEM"
 
     echo "Created the following files:"
-    echo "  $CERT_CA_TYPE cert req   : $CERT_CSR_PEM"
-    echo "  $CERT_CA_TYPE certificate: $CERT_CERT_PEM"
-    echo "  $CERT_CA_TYPE private key: $CERT_KEY_PEM"
-    echo "  $CERT_CA_TYPE new cert   : $PARENT_IA_NPARENT_IA_NEWCERT_NEW_PEM"
-    echo "  $CERT_CA_TYPE chain cert : $CERT_CHAIN_PEM"
-    echo "  $CERT_CA_TYPE CRL        : $CERT_CRL_PEM"
-    echo "  $CERT_CA_TYPE REQ cnf    : $CERT_OPENSSL_CNF_REQ_FILE"
-    echo "  $CERT_CA_TYPE REQ cnf extension  : $CERT_OPENSSL_CNF_REQ_EXTFILE"
-    echo "  $CERT_CA_TYPE CA cnf    : $PARENT_IA_OPENSSL_CNF_CA_FILE"
-    echo "  $CERT_CA_TYPE CA cnf extension  : $PARENT_IA_OPENSSL_CNF_CA_EXTFILE"
+    echo "  $CERT_NODE_TYPE cert req   : $CERT_CSR_PEM"
+    echo "  $CERT_NODE_TYPE certificate: $CERT_CERT_PEM"
+    echo "  $CERT_NODE_TYPE private key: $CERT_KEY_PEM"
+    echo "  $CERT_NODE_TYPE new cert   : $CA_NEWCERT_CURRENT_PEM"
+    echo "  $CERT_NODE_TYPE chain cert : $CERT_CHAIN_PEM"
+    echo "  $CERT_NODE_TYPE CRL        : $CERT_CRL_PEM"
+    echo "  $CERT_NODE_TYPE REQ cnf    : $CERT_OPENSSL_CNF_REQ_FILE"
+    echo "  $CERT_NODE_TYPE REQ cnf extension  : $CERT_OPENSSL_CNF_REQ_EXTFILE"
+    echo "  $CERT_NODE_TYPE CA cnf    : $PARENT_IA_OPENSSL_CNF_CA_FILE"
+    echo "  $CERT_NODE_TYPE CA cnf extension  : $PARENT_IA_OPENSSL_CNF_CA_EXTFILE"
 }
 
 
@@ -1478,8 +1550,8 @@ function cmd_verify_cert {
 ##########################################################################
 
 # Call getopt to validate the provided input.
-options=$(getopt -o a:b:c:fg:hk:m:nTv \
-          --long algorithm:,base-dir:,cipher:,force-delete,group:,help,keysize:,message-digest:,nested-ca,traditional,verbose "$@")
+options=$(getopt -o a:b:c:dfg:hk:m:nTv \
+          -l algorithm:,base-dir:,cipher:,dry-run,force-delete,group:,help,keysize:,message-digest:,nested-ca,traditional,verbose -- "$@")
 RETSTS=$?
 [[ ${RETSTS} -eq 0 ]] || {
     echo "Incorrect options provided"
@@ -1523,6 +1595,9 @@ while true; do
     -c|--cipher)
         shift;  # The arg is next in position args
         CIPHER=$1
+        ;;
+    -d|--dry-run)
+        DRY_RUN="echo"
         ;;
     -f|--force-delete)
         FORCE_DELETE_CONFIG=1
@@ -1614,35 +1689,38 @@ elif [[ "$CMD_MODE" == "create" ]]; then
   # ocsp email identity encryption codesign timestamping
   case "$ARGOPT_CA_TYPE" in
     server)
-      CA_TYPE="server"
+      NODE_TYPE="server"
       ;;
     client)
-      CA_TYPE="client"
+      NODE_TYPE="client"
       ;;
     ocsp)
-      CA_TYPE="ocsp"
+      NODE_TYPE="ocsp"
       ;;
     timestamping)
-      CA_TYPE="timestamping"
+      NODE_TYPE="timestamping"
       ;;
     email)
-      CA_TYPE="email"
+      NODE_TYPE="email"
       ;;
     encryption)
-      CA_TYPE="encryption"
+      NODE_TYPE="encryption"
       ;;
     codesign)
-      CA_TYPE="codesign"
+      NODE_TYPE="codesign"
+      ;;
+    proxy)
+      NODE_TYPE="codesign"
       ;;
     *)
       cmd_show_syntax_usage
       echo "Error in CA-TYPE: '$ARGOPT_CA_TYPE' argument."
       echo "Valid options are server, client, ocsp, timestamping, "
-      echo "       email, encryption, codesign"
+      echo "       email, encryption, codesign and proxy"
       exit 255
       ;;
   esac
-  CERT_CA_TYPE="$CA_TYPE"
+  CERT_NODE_TYPE="$NODE_TYPE"
   ARGOPT_PARENT_CA_NAME="$4"
 elif [[ "$CMD_MODE" == "verify" ]]; then
   ARGOPT_PARENT_CA_NAME="$3"
@@ -1885,28 +1963,20 @@ export SSL_CERT_FILE="/dev/null"
 # Two of the files are used during 'openssl req' command:
 #  1. Generalized certificate OpenSSL configuration file
 #  2. Type-of-Certificate Request Extension file
-CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}-req-${CERT_FNAME}.cnf"
-CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}-req-${CERT_FNAME}.extensions.cnf"
+CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}__${NODE_TYPE}__${CERT_FNAME}__req.cnf"
+CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}__${NODE_TYPE}__${CERT_FNAME}__reqext.cnf"
 
 #
 # Other two files are used during 'openssl ca' command:
 #  1. Signing CA main config file (must match to ones created by tls-ca-manage.sh)
 #  2. Type-of-Certificate CA Extension file
 PARENT_IA_OPENSSL_CNF_CA_FILE="$CERT_EXT_DIR/$PARENT_IA_FNAME.cnf"
-PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$CERT_EXT_DIR/$PARENT_IA_FNAME-${CERT_FNAME}.extensions.cnf"
+PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}__${NODE_TYPE}__${CERT_FNAME}__ext.cnf"
 #
 # We create three of those files, exactly once despite multiple execution.
 # Force (-f) option will help delete those files and replace it with new ones
 # This makes it possible to customize these files (until -f option gets used)
 #
-# We auto-custom 'section_name' between file #1 and #2 in each 'openssl req'
-# and 'openssl ca' commands, to tie these two files together.
-#
-# In 'openssl ca', section name is a simplified parent node name
-THIS_SECTION="req_x509_extensions_${PARENT_IA_SNAME}_${CERT_SNAME}"
-
-PARENT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/cert_req_${CA_TYPE}.cnf"
-### CERT_OPENSSL_CNF_EXT_FILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}_cert_x509_extensions_${CERT_FNAME}.cnf"
 
 # Define all the OpenSSL commands
 OPENSSL_REQ="$OPENSSL req -config ${CERT_OPENSSL_CNF_REQ_FILE}"
