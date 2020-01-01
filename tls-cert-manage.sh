@@ -198,17 +198,18 @@ DEFAULT_FILETYPE_PFX="pfx"   # sometimes .p12 (PKCS#12)
 DEFAULT_OFSTD_LAYOUT="centralized"
 DEFAULT_OFSTD_DIR_TREE_TYPE="flat"
 
+DEF_DOMAIN="example.invalid"
 DEFAULT_CA_X509_COUNTRY="US"
 DEFAULT_CA_X509_STATE=""
 DEFAULT_CA_X509_LOCALITY=""
 DEFAULT_CA_X509_COMMON="ACME Internal Root CA A1"
 DEFAULT_CA_X509_ORG="ACME Networks"
 DEFAULT_CA_X509_OU="Trust Division"
-DEFAULT_CA_X509_EMAIL="ca.example@example.invalid"
+DEFAULT_CA_X509_EMAIL="ca.example@${DEF_DOMAIN}"
 # Do not use HTTPS in X509_CRL (Catch-22)
-DEFAULT_CA_X509_CRL="http://example.invalid/ca/example-crl.$DEFAULT_FILETYPE_CERT"
-DEFAULT_CA_X509_URL_BASE="http://example.invalid/ca"
-DEFAULT_CA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
+DEFAULT_CA_X509_CRL="http://${DEF_DOMAIN}/ca/example-crl.$DEFAULT_FILETYPE_CERT"
+DEFAULT_CA_X509_URL_BASE="http://${DEF_DOMAIN}/ca"
+DEFAULT_CA_X509_URL_OCSP="http://ocsp.${DEF_DOMAIN}:9080"
 
 DEFAULT_INTCA_X509_COUNTRY="US"
 DEFAULT_INTCA_X509_STATE=""
@@ -216,10 +217,10 @@ DEFAULT_INTCA_X509_LOCALITY=""
 DEFAULT_INTCA_X509_COMMON="ACME Internal Intermediate CA B2"
 DEFAULT_INTCA_X509_ORG="ACME Networks"
 DEFAULT_INTCA_X509_OU="Semi-Trust Department"
-DEFAULT_INTCA_X509_EMAIL="ca.subroot@example.invalid"
-DEFAULT_INTCA_X509_CRL="http://example.invalid/subroot-ca.crl"
-DEFAULT_INTCA_X509_URL_BASE="http://example.invalid/ca/subroot"
-DEFAULT_INTCA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
+DEFAULT_INTCA_X509_EMAIL="ca.subroot@${DEF_DOMAIN}"
+DEFAULT_INTCA_X509_CRL="http://${DEF_DOMAIN}/subroot-ca.crl"
+DEFAULT_INTCA_X509_URL_BASE="http://${DEF_DOMAIN}/ca/subroot"
+DEFAULT_INTCA_X509_URL_OCSP="http://ocsp.${DEF_DOMAIN}:9080"
 
 
 function input_data {
@@ -604,8 +605,15 @@ function data_entry_generic {
     X509_LOCALITY="$ID_INPUT_DATA"
     input_data "Contact email: " "$X509_EMAIL"
     X509_EMAIL="$ID_INPUT_DATA"
+
     input_data "Base URL: " "$X509_URL_BASE"
-    X509_URL="$ID_INPUT_DATA"
+    X509_URL_BASE="$ID_INPUT_DATA"
+
+    X509_URL_OCSP="${X509_URL_BASE}:9080/ocsp"
+    input_data "OCSP URL: " "$X509_URL_OCSP"
+    X509_URL_OCSP="$ID_INPUT_DATA"
+
+    X509_CRL="${X509_URL_BASE}/${CERT_CRL_FNAME}"
     input_data "CRL URL: " "$X509_CRL"
     X509_CRL="$ID_INPUT_DATA"
 }
@@ -638,9 +646,11 @@ function get_x509v3_extension_by_cert_type {
       # CNF_REQ_EXT_AIA="@ocsp_info"
       # CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_AIA=""
+      CNF_REQ_EXT_CRL=""
+      CNF_REQ_EXT_EXTRA=""
       # signing-ca.cnf/[server_ext]
       # email-ca.cnf/[server_ext]
-      CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
+      CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"
       CNF_CA_EXT_SKI="hash"
       CNF_CA_EXT_AKI="keyid,issuer:always"
@@ -649,7 +659,10 @@ function get_x509v3_extension_by_cert_type {
       # Only need serverAuth & clientAuth together if
       #   making a PEM key that combines private and public key (bad idea)
       # CNF_CA_EXT_SAN="\$ENV::SAN"  # subjectAltName
-      CNF_CA_EXT_AIA="@issuer_info"
+      CNF_CA_EXT_AIA="@ocsp_info"
+      CNF_CA_EXT_CRL="URI:${X509_CRL}"
+      CNF_CA_EXT_EXTRA=""
+
       ###
       ;;
     client)
@@ -660,6 +673,8 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="clientAuth"
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
+      CNF_REQ_EXT_CRL=""
+      CNF_REQ_EXT_EXTRA=""
       # email-ca.cnf/[client_ext]
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"
@@ -667,7 +682,9 @@ function get_x509v3_extension_by_cert_type {
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
       CNF_CA_EXT_EKU="clientAuth"
       CNF_CA_EXT_SAN="email:move"  # subjectAltName
-      CNF_CA_EXT_AIA="@issuer_info"
+      CNF_CA_EXT_AIA="@ocsp_info"
+      CNF_CA_EXT_CRL="URI:${X509_CRL}"
+      CNF_CA_EXT_EXTRA=""
       ;;
     timestamping)
       CNF_REQ_EXT_KU="critical,digitalSignature"
@@ -677,6 +694,8 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="critical,timeStamping"
       CNF_REQ_EXT_SAN=""  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
+      CNF_REQ_EXT_CRL=""
+      CNF_REQ_EXT_EXTRA=""
       ;;
     ocsp)
       CNF_REQ_EXT_KU="critical,digitalSignature"
@@ -686,6 +705,8 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="critical,OCSPSigning"
       CNF_REQ_EXT_SAN=""  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
+      CNF_REQ_EXT_CRL=""
+      CNF_REQ_EXT_EXTRA=""
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
@@ -693,6 +714,7 @@ function get_x509v3_extension_by_cert_type {
       CNF_CA_EXT_EKU="critical,OCSPSigning"
       CNF_CA_EXT_SAN=""  # subjectAltName
       CNF_CA_EXT_AIA=""
+      CNF_CA_EXT_CRL=""
       CNF_CA_EXT_EXTRA="noCheck = null"
       ;;
     email)
@@ -703,6 +725,8 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="emailProtection,clientAuth"
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
+      CNF_REQ_EXT_CRL=""
+      CNF_REQ_EXT_EXTRA=""
       # signing-ca.cnf/[email_ext]
       # email-ca.cnf/[email_ext]
       CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
@@ -712,6 +736,8 @@ function get_x509v3_extension_by_cert_type {
       CNF_CA_EXT_EKU="emailProtection,clientAuth,anyExtendedKeyUsage"
       CNF_CA_EXT_SAN=""  # subjectAltName
       CNF_CA_EXT_AIA="@issuer_info"
+      CNF_CA_EXT_CRL=""
+      CNF_CA_EXT_EXTRA=""
     ;;
     # encryption supports 802.1ar, Microsoft Encrypted File System
     encryption)
@@ -725,6 +751,8 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="emailProtection,clientAuth,msEFS"
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
+      CNF_REQ_EXT_CRL=""
+      CNF_REQ_EXT_EXTRA=""
       ;;
     identity)  # there's identity-ca and identity, this here is identity-ca
       CNF_REQ_EXT_KU="critical,digitalSignature"
@@ -735,6 +763,8 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="emailProtection,clientAuth,msSmartcardLogin"
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
+      CNF_REQ_EXT_CRL=""
+      CNF_REQ_EXT_EXTRA=""
       ;;
     codesign)
       CNF_REQ_EXT_KU="critical,digitalSignature"
@@ -744,6 +774,8 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_EKU="critical,codeSigning"
       CNF_REQ_EXT_SAN=""  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"  # authorityInfoAccess
+      CNF_REQ_EXT_CRL=""
+      CNF_REQ_EXT_EXTRA=""
       # software-ca.cnf/[codesign_ext]
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"  # basicConstraint
@@ -752,6 +784,8 @@ function get_x509v3_extension_by_cert_type {
       CNF_CA_EXT_EKU="critical,codeSigning"
       CNF_CA_EXT_SAN=""  # subjectAltName
       CNF_CA_EXT_AIA="@issuer_info"  # authorityInfoAccess
+      CNF_CA_EXT_CRL=""
+      CNF_CA_EXT_EXTRA=""
       ;;
     *)
       echo "Invalid '$GXEBCT_CA_TYPE' option"
@@ -812,11 +846,11 @@ function create_generic_cert_req_config_file
 #    ${CERT_NAME}:    this node
 #
 [ default ]
-SAN                     = DNS:example.invalid
+SAN                     = DNS:${DEF_DOMAIN}
 base_url                = ${X509_URL_BASE}        # CA base URL
 aia_url                 = ${X509_URL_BASE}/${IA_CERT_FNAME}     # CA certificate URL
-crl_url                 = ${X509_URL_BASE}/${IA_CRL_FNAME}     # CRL distribution point
-ocsp_url                = ${X509_URL_BASE}/ocsp
+crl_url                 = ${X509_CRL}     # CRL distribution point
+ocsp_url                = ${X509_URL_OCSP}
 
 [ req ]
 default_bits            = $KEYSIZE_BITS         # RSA key size
@@ -874,7 +908,7 @@ emailAddress_max                = 64
     write_line_or_no "extendedKeyUsage"       "$CNF_REQ_EXT_EKU" "$CGCRCF_CNFFILE"
     write_line_or_no "subjectAltName"         "$CNF_REQ_EXT_SAN" "$CGCRCF_CNFFILE"
     write_line_or_no "authorityInfoAccess"    "$CNF_REQ_EXT_AIA" "$CGCRCF_CNFFILE"
-    write_line_or_no "crlDistributionPoint"   "" "$CGCRCF_CNFFILE"
+    write_line_or_no "crlDistributionPoints"   "$CNF_REQ_EXT_CRL" "$CGCRCF_CNFFILE"
     echo "$CNF_CA_EXT_EXTRA" >> "$CGCRCF_CNFFILE"
     echo "#
 [ crl_ext ]
@@ -937,9 +971,9 @@ function create_generic_ca_extension_config_file
 
 
 base_url                = ${X509_URL_BASE}        # CA base URL
-aia_url                 = ${X509_URL_BASE}/${CERT_FNAME}     # CA certificate URL
-crl_url                 = ${X509_URL_BASE}/${IA_CRL_FNAME}     # CRL distribution point
-ocsp_url                = ${X509_URL_BASE}/ocsp
+aia_url                 = ${X509_URL_BASE}/${IA_CERT_FNAME}     # CA certificate URL
+crl_url                 = ${X509_CRL}     # CRL distribution point
+ocsp_url                = ${X509_URL_OCSP}
 
 # Section name could be a simple ${NODE_TYPE} name
 # But having CA_TYPE-CA_NAME makes it possible to support
@@ -953,7 +987,7 @@ ocsp_url                = ${X509_URL_BASE}/ocsp
     write_line_or_no "extendedKeyUsage"       "$CNF_CA_EXT_EKU" "$CCEC_EXTFILE"
     write_line_or_no "subjectAltName"         "$CNF_CA_EXT_SAN" "$CCEC_EXTFILE"
     write_line_or_no "authorityInfoAccess"    "$CNF_CA_EXT_AIA" "$CCEC_EXTFILE"
-    write_line_or_no "crlDistributionPoint"   "" "$CCEC_EXTFILE"
+    write_line_or_no "crlDistributionPoints"   "$CNF_CA_EXT_CRL" "$CCEC_EXTFILE"
     echo "$CNF_CA_EXT_EXTRA" >> "$CCEC_EXTFILE"
     echo """#
 [ ocsp_info ]

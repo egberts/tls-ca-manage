@@ -872,14 +872,19 @@ function get_x509v3_extension_by_ca_type {
 #      CNF_CA_EXT_CE="copy"  # copy_extensions
 #      ;;
     server)
+      # Missing the following:
+      #      X509v3 Certificate Policies: 
+      #          Policy: 2.23.140.1.2.2
+      #            CPS: https://pki.goog/repository/
+
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
       CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # signing-ca.cnf/[server_ext]
       # email-ca.cnf/[server_ext]
       # component-ca.cnf/[server_ext]
-      CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
-      CNF_CA_EXT_BC="CA:false"
+      CNF_CA_EXT_KU="critical,digitalSignature,keyCertSign,cRLSign"
+      CNF_CA_EXT_BC="CA:true,pathlen:0"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
       # CNF_CA_EXT_AKI="keyid,issuer:always"  # used in 802.1ar iDevID
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
@@ -890,6 +895,15 @@ function get_x509v3_extension_by_ca_type {
       # CNF_CA_EXT_SAN="\$ENV::SAN"  # subjectAltName
       CNF_CA_EXT_SAN=""  # subjectAltName
       CNF_CA_EXT_AIA="@ocsp_info"
+      # known_policies = {
+      #        '2.23.140.2.1': 'test certificate',
+      #        '2.23.140.1.2.1': 'DV', Domain-validated
+      #        '2.23.140.1.2.2': 'OV', Organization-validated
+      #        '2.23.140.1.2.3': 'IV', Individual-validated
+      #        '2.23.140.1.3':   'EV', Extended-validated
+      #        '2.23.140.1.31':  '.onion' TOR service description OID
+      #}
+      CNF_CA_EXT_EXTRA="crlDistributionPoints=URI:${X509_URL_BASE}/${IA_CRL_FNAME}"
       ;;
     client)
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
@@ -898,7 +912,7 @@ function get_x509v3_extension_by_ca_type {
       # email-ca.cnf/[client_ext]
       # CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"  # very old
       CNF_CA_EXT_KU="critical,digitalSignature"
-      CNF_CA_EXT_BC="CA:false"
+      CNF_CA_EXT_BC="CA:true,pathlen:0"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
       CNF_CA_EXT_EKU="clientAuth"
@@ -911,7 +925,7 @@ function get_x509v3_extension_by_ca_type {
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # component-ca.cnf/[timestamp_ext]
       CNF_CA_EXT_KU="critical,digitalSignature"
-      CNF_CA_EXT_BC="CA:false"
+      CNF_CA_EXT_BC="CA:true,pathlen:0"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
       CNF_CA_EXT_EKU="critical,timeStamping"
@@ -941,7 +955,7 @@ function get_x509v3_extension_by_ca_type {
       # signing-ca.cnf/[email_ext]
       # email-ca.cnf/[email_ext]
       CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
-      CNF_CA_EXT_BC="CA:false"  # basicConstraint
+      CNF_CA_EXT_BC="CA:true,pathlen:0"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
       CNF_CA_EXT_EKU="emailProtection,clientAuth,anyExtendedKeyUsage"
@@ -954,7 +968,7 @@ function get_x509v3_extension_by_ca_type {
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # identity-ca.cnf/[encryption_ext]
       CNF_CA_EXT_KU="critical,keyEncipherment"  # keyUsage
-      CNF_CA_EXT_BC="CA:false"  # basicConstraint
+      CNF_CA_EXT_BC="CA:true,pathlen:0"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
       # email encryption = "emailProtection,clientAuth"
@@ -970,7 +984,7 @@ function get_x509v3_extension_by_ca_type {
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # identity-ca.cnf/[identity_ext]
       CNF_CA_EXT_KU="critical,digitalSignature"
-      CNF_CA_EXT_BC="CA:false"  # basicConstraint
+      CNF_CA_EXT_BC="CA:true,pathlen:0"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
       CNF_CA_EXT_EKU="emailProtection,clientAuth,msSmartcardLogin"
@@ -983,7 +997,7 @@ function get_x509v3_extension_by_ca_type {
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # software-ca.cnf/[codesign_ext]
       CNF_CA_EXT_KU="critical,digitalSignature"
-      CNF_CA_EXT_BC="CA:false"  # basicConstraint
+      CNF_CA_EXT_BC="CA:true,pathlen:0"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
       CNF_CA_EXT_EKU="critical,codeSigning"
@@ -1190,7 +1204,7 @@ ocsp_url                = ${X509_URL_BASE}/ocsp
     write_line_or_no "extendedKeyUsage"       "$CNF_CA_EXT_EKU" "$CIC_INTERNODE_CONFIG_FILESPEC"
     write_line_or_no "subjectAltName"         "$CNF_CA_EXT_SAN" "$CIC_INTERNODE_CONFIG_FILESPEC"
     write_line_or_no "authorityInfoAccess"    "$CNF_CA_EXT_AIA" "$CIC_INTERNODE_CONFIG_FILESPEC"
-    write_line_or_no "crlDistributionPoint"   "" "$CIC_INTERNODE_CONFIG_FILESPEC"
+    write_line_or_no "crlDistributionPoints"   "" "$CIC_INTERNODE_CONFIG_FILESPEC"
     echo "$CNF_CA_EXT_EXTRA" >> "$CIC_INTERNODE_CONFIG_FILESPEC"
 
     echo """#
