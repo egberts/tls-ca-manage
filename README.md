@@ -90,6 +90,7 @@ for that would make its end-node too over-privileged.  Make a unique single-type
 'endnode' for each cert type.
 
 This doesn't work:
+
     tls-ca-manage.sh create -p root -t root root
     tls-ca-manage.sh create -p root -t endnode mycompany_intca
     # splitting a CA into multiple functions (bad)
@@ -97,6 +98,7 @@ This doesn't work:
     tls-cert-manage.sh create mycompany_emails server mycompany_intca
 
 This works best:
+
     tls-ca-manage.sh create -p root -t root root
     # making an endnode CA into a unique function (good)
     tls-ca-manage.sh create -p root -t email mycompany_emails
@@ -140,11 +142,11 @@ CA can be Root CA or Intermediate CA.
 
 Mandatory  arguments  to  long  options are mandatory for short options too.
 
--a, --algorithm
-  Selects the cipher algorithm.
-  Valid algorithms are: rsa, ecdsa, poly1305 OR ed25519
-  These value are case-sensitive.
-  If no algorithm specified, then RSA is used by default.
+    -a, --algorithm
+      Selects the cipher algorithm.
+      Valid algorithms are: rsa, ecdsa, poly1305 OR ed25519
+      These value are case-sensitive.
+      If no algorithm specified, then RSA is used by default.
 
     -b, --base-dir
         The top-level directory of SSL, typically /etc/ssl
@@ -195,11 +197,11 @@ Mandatory  arguments  to  long  options are mandatory for short options too.
         Valid ecdsa key sizes are: 521, 384, 256, 224 or 192.
 
     -m, --message-digest
- blake2b512        blake2s256        gost              md4
- md5               rmd160            sha1              sha224
- sha256            sha3-224          sha3-256          sha3-384
- sha3-512          sha384            sha512            sha512-224
- sha512-256        shake128          shake256          sm3
+     blake2b512        blake2s256        gost              md4
+     md5               rmd160            sha1              sha224
+     sha256            sha3-224          sha3-256          sha3-384
+     sha3-512          sha384            sha512            sha512-224
+     sha512-256        shake128          shake256          sm3
 
     -n, --nested-ca
         First chaining of first-level CAs are placed in subdirectory inside
@@ -267,6 +269,7 @@ Inspired by: https://jamielinux.com/docs/openssl-certificate-authority/create-th
 
 
 # Commands
+
     tls-ca-managed.sh  - Creates/Renew/Verify all CA nodes (root or intermediate)
     tls-create-server.sh - Adds all the end-CAs (TLS servers, ...)
 
