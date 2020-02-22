@@ -36,8 +36,8 @@
 #
 #        This argument is used only with 'create' command line option
 #
-#    CA-NAME 
-#        Specifies the simple name of CA in which to sign this 
+#    CA-NAME
+#        Specifies the simple name of CA in which to sign this
 #        certificate against with. It may be the Root CA name
 #        or the Intermediate CA name.  The CA name is
 #        the same CA-NAME used when creating the parent CA.
@@ -71,7 +71,7 @@
 #
 #    -c, --cipher
 #        Specify the cipher method of the PEM key file in
-#        which to password-protect the key with.  
+#        which to password-protect the key with.
 #        Default is a plaintext key file with no password protection.
 #
 #    -f, --force-delete
@@ -134,11 +134,11 @@
 #
 
 function cmd_show_syntax_usage {
-    echo """Usage:  
+    echo """Usage:
   $0 create [options] <cert-name> <cert-type> <ca-name>
   $0 renew [options] <cert-name> <ca-name>
   $0 revoke [options] <cert-name> <ca-name> <reason>
-  $0 verify [options] <cert-name> 
+  $0 verify [options] <cert-name>
   $0 help
 
   cert-name: A simple filename for this certificate
@@ -1062,7 +1062,7 @@ function cert_create_public_key
 #                                <internode_filespec> \
 #                                <parent_node_name>
 #########################################################
-function cert_create_csr 
+function cert_create_csr
 {
     CCC_SECTION_NAME=$1
     CCC_CERT_CONFIG_FILESPEC=$2
@@ -1584,8 +1584,7 @@ function cmd_verify_cert {
 ##########################################################################
 
 # Call getopt to validate the provided input.
-options=$(getopt -o a:b:c:dfg:hk:m:nTv \
-          -l algorithm:,base-dir:,cipher:,dry-run,force-delete,group:,help,keysize:,message-digest:,nested-ca,traditional,verbose -- "$@")
+options=$(getopt -o a:b:c:dfg:hk:m:nTv -l algorithm:,base-dir:,cipher:,dry-run,force-delete,group:,help,keysize:,message-digest:,nested-ca,traditional,verbose -- "$@")
 RETSTS=$?
 [[ ${RETSTS} -eq 0 ]] || {
     echo "Incorrect options provided"
@@ -1762,7 +1761,7 @@ else
   cmd_show_syntax_usage
   echo "Valid 1st argument values are: create, renew, revoke, verify"
   exit 255
-fi  
+fi
 PARENT_IA_NAME="$ARGOPT_PARENT_CA_NAME"
 
 # Check group
