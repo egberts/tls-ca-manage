@@ -273,17 +273,18 @@ DEFAULT_FILETYPE_PFX="pfx"   # sometimes .p12 (PKCS#12)
 DEFAULT_OFSTD_LAYOUT="centralized"
 DEFAULT_OFSTD_DIR_TREE_TYPE="flat"
 
+DEF_DOMAIN="example.invalid"
 DEFAULT_CA_X509_COUNTRY="US"
 DEFAULT_CA_X509_STATE=""
 DEFAULT_CA_X509_LOCALITY=""
 DEFAULT_CA_X509_COMMON="ACME Internal Root CA A1"
 DEFAULT_CA_X509_ORG="ACME Networks"
 DEFAULT_CA_X509_OU="Trust Division"
-DEFAULT_CA_X509_EMAIL="ca.example@example.invalid"
+DEFAULT_CA_X509_EMAIL="ca.example@${DEF_DOMAIN}"
 # Do not use HTTPS in X509_CRL (Catch-22)
-DEFAULT_CA_X509_CRL="http://example.invalid/ca/example-crl.$DEFAULT_FILETYPE_CERT"
-DEFAULT_CA_X509_URL_BASE="http://example.invalid/ca"
-DEFAULT_CA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
+DEFAULT_CA_X509_CRL="http://${DEF_DOMAIN}/ca/example-crl.$DEFAULT_FILETYPE_CERT"
+DEFAULT_CA_X509_URL_BASE="http://${DEF_DOMAIN}/ca"
+DEFAULT_CA_X509_URL_OCSP="${DEFAULT_CA_X509_URL_BASE}:9080/ocsp"
 
 DEFAULT_INTCA_X509_COUNTRY="US"
 DEFAULT_INTCA_X509_STATE=""
@@ -292,9 +293,9 @@ DEFAULT_INTCA_X509_COMMON="ACME Internal Intermediate CA B2"
 DEFAULT_INTCA_X509_ORG="ACME Networks"
 DEFAULT_INTCA_X509_OU="Semi-Trust Department"
 DEFAULT_INTCA_X509_EMAIL="ca.subroot@example.invalid"
-DEFAULT_INTCA_X509_CRL="http://example.invalid/subroot-ca.crl"
-DEFAULT_INTCA_X509_URL_BASE="http://example.invalid/ca/subroot"
-DEFAULT_INTCA_X509_URL_OCSP="http://ocsp.example.invalid:9080"
+DEFAULT_INTCA_X509_URL_BASE="http://${DEF_DOMAIN}/ca"
+DEFAULT_INTCA_X509_CRL="http://${DEF_DOMAIN}/ca/${CERT_CRL_FNAME}.$DEFAULT_FILETYPE_CERT"
+DEFAULT_INTCA_X509_URL_OCSP="${DEFAULT_CA_X509_URL_BASE}:9080/ocsp"
 
 
 function input_x509_data {
@@ -819,9 +820,12 @@ function get_x509v3_extension_by_ca_type {
     standalone)
       CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
     # TODO Gonna need those CNF_REQ_ back in here again
-      CNF_CA_EXT_KU=""  # keyUsage
+      CNF_REQ_EXT_KU="critical,digitalSignature,keyCertSign,cRLSign"  # keyUsage
+      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+
       CNF_CA_EXT_BC="CA:false,pathlen:0"  # basicConstraint
-      CNF_CA_EXT_SKI="" # subjectKeyIdentifier
+      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+      CNF_CA_EXT_KU="critical,digitalSignature,keyCertSign,cRLSign"  # keyUsage
       CNF_CA_EXT_AKI=""  # authorityKeyIdentifier
       CNF_CA_EXT_EKU=""  # extendedKeyUsage
       CNF_CA_EXT_SAN=""  # subjectAltName
@@ -873,7 +877,7 @@ function get_x509v3_extension_by_ca_type {
 #      ;;
     server)
       # Missing the following:
-      #      X509v3 Certificate Policies: 
+      #      X509v3 Certificate Policies:
       #          Policy: 2.23.140.1.2.2
       #            CPS: https://pki.goog/repository/
 
@@ -903,7 +907,7 @@ function get_x509v3_extension_by_ca_type {
       #        '2.23.140.1.3':   'EV', Extended-validated
       #        '2.23.140.1.31':  '.onion' TOR service description OID
       #}
-      CNF_CA_EXT_EXTRA="crlDistributionPoints=URI:${X509_URL_BASE}/${IA_CRL_FNAME}"
+      CNF_CA_EXT_EXTRA="crlDistributionPoints=URI:${X509_CRL}"
       ;;
     client)
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
@@ -1073,7 +1077,7 @@ localityName            = ${X509_LOCALITY}
 0.organizationName      = ${X509_ORG}
 
 # we can do this but it is not needed normally :-)
-#1.organizationName	= World Wide Web Pty Ltd
+#1.organizationName = World Wide Web Pty Ltd
 
 organizationalUnitName  = ${X509_OU}
 commonName              = ${X509_COMMON}
@@ -1204,7 +1208,7 @@ ocsp_url                = ${X509_URL_BASE}/ocsp
     write_line_or_no "extendedKeyUsage"       "$CNF_CA_EXT_EKU" "$CIC_INTERNODE_CONFIG_FILESPEC"
     write_line_or_no "subjectAltName"         "$CNF_CA_EXT_SAN" "$CIC_INTERNODE_CONFIG_FILESPEC"
     write_line_or_no "authorityInfoAccess"    "$CNF_CA_EXT_AIA" "$CIC_INTERNODE_CONFIG_FILESPEC"
-    write_line_or_no "crlDistributionPoints"   "" "$CIC_INTERNODE_CONFIG_FILESPEC"
+    write_line_or_no "crlDistributionPoints"   "$CNF_CA_EXT_CRL" "$CIC_INTERNODE_CONFIG_FILESPEC"
     echo "$CNF_CA_EXT_EXTRA" >> "$CIC_INTERNODE_CONFIG_FILESPEC"
 
     echo """#
@@ -1809,6 +1813,11 @@ function cmd_verify_ca {
         exit 1
     fi
 
+    if [[ "$NODE_TYPE" == "standalone" ]]; then
+        return
+    fi
+
+
     if [[ "$PEER_SIGNATURE" == "rsa" ]]; then
         # check test signature
         # This is only valid with '--algorithm rsa' option
@@ -1857,8 +1866,7 @@ function cmd_verify_ca {
 ##########################################################################
 
 # Call getopt to validate the provided input.
-options=$(getopt -o a:b:c:dfg:hik:m:np:s:t:Tv \
-          --long algorithm:,base-dir:,cipher:,dry-run,force-delete,group:,help,intermediate-node,keysize:,message-digest:,nested-ca,parent-ca:,serial:,ca-type:,traditional,verbose "$@")
+options=$(getopt -o a:b:c:dfg:hik:m:np:s:t:Tv -l algorithm:,base-dir:,cipher:,dry-run,force-delete,group:,help,intermediate-node,keysize:,message-digest:,nested-ca,parent-ca:,serial:,ca-type:,traditional,verbose -- "$@")
 RETSTS=$?
 [[ ${RETSTS} -eq 0 ]] || {
     echo "Incorrect options provided"
