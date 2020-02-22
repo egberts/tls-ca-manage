@@ -4,40 +4,40 @@
 #
 # Suitable for medium to large enterprise
 #
+TLS_CA_MANAGE="../tls-ca-manage.sh"
+TLS_CERT_MANAGE="../tls-cert-manage.sh"
 
 # Create Root CA
-tls-ca-manage.sh --intermediate-node root
+${TLS_CA_MANAGE} create -t root AcmeRoot
 
 #  Create intermediates CA
-tls-ca-manage.sh create -i --parent-ca root network
+${TLS_CA_MANAGE} create -p root -t intermediate AcmeNetwork
 
 #  Create signing CAs
-tls-ca-manage.sh create -p network component
-tls-ca-manage.sh create -p network identity
-tls-ca-manage.sh create -p network security
-tls-ca-manage.sh create -p network other
+${TLS_CA_MANAGE} create -p AcmeNetwork -t intermediate AcmeComponent
+${TLS_CA_MANAGE} create -p AcmeNetwork -t intermediate AcmeIdentity
+${TLS_CA_MANAGE} create -p AcmeNetwork -t intermediate AcmeSecurity
+${TLS_CA_MANAGE} create -p AcmeNetwork -t intermediate AcmeOther
 
 #  Create signing CAs under Component intermediate CA
-tls-csr-manage.sh create -p component -t digitalSignature,keyEncipherment,serverAuth,clientAuth tls-secured-portal  # TLS Server
-tls-csr-manage.sh create -p component -t digitalSignature,OCSPSigning ocsp-responder
-tls-csr-manage.sh create -p component -t digitalSignature,timeStamping time-server
-tls-csr-manage.sh create -p component -t digitalSignature,clientAuth tls-secured-login # TLS Client
-tls-csr-manage.sh create -p component \
-    -t nonRepudiation,digitalSignature,keyEncipherment,keyAgreement,serverAuth \
-    vpn-servers
-tls-csr-manage.sh create -p component \
-    -t nonRepudiation,digitalSignature,keyEncipherment,clientAuth \
+${TLS_CERT_MANAGE} create -p AcmeComponent -t server tls-secured-portals
+${TLS_CERT_MANAGE} create -p AcmeComponent -t ocsp AcmeOCSP
+${TLS_CERT_MANAGE} create -p AcmeComponent -t timestamping AcmeTimeStamping
+${TLS_CERT_MANAGE} create -p AcmeComponent -t client tls-secured-login # TLS Client
+${TLS_CERT_MANAGE} create -p AcmeComponent -t server vpn-servers
+${TLS_CERT_MANAGE} create -p AcmeComponent -t client vpn-clients
     vpn-clients
 
 #  Create signing CAs under Identity intermediate CA
-tls-csr-manage.sh -p identity -t keyEncipherment,emailProtection user-mail-encryption
-# https://blog.benjojo.co.uk/post/tls-https-server-from-a-yubikey
-tls-csr-manage.sh -p identity -t digitalSignature,clientAuth secured-smartcardkeys
+${TLS_CERT_MANAGE} create -p AcmeIdentity -t email user-mail-encryption
 
-tls-csr-manage.sh -p identity -t digitalSignature,emailProtection,clientAuth user-mail-identity
+# https://blog.benjojo.co.uk/post/tls-https-server-from-a-yubikey
+${TLS_CERT_MANAGE} create -p AcmeIdentity -t smartcard secured-smartcardkeys
+
+${TLS_CERT_MANAGE} create -p AcmeIdentity -t identity user-mail-identity
 
 #  Create signing CAs under Security intermediate CA
-tls-csr-manage.sh -p security -t identity building-cardreaders
-tls-csr-manage.sh -p security -t identity guardstations
-tls-csr-manage.sh -p security -t identity control
+${TLS_CERT_MANAGE} create -p AcmeSecurity -t identity building-cardreaders
+${TLS_CERT_MANAGE} create -p AcmeSecurity -t identity guardstations
+${TLS_CERT_MANAGE} create -p AcmeSecurity -t identity control
 

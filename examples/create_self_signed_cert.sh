@@ -2,9 +2,13 @@
 #
 # Create a self-signed certificate
 #
+TLS_CA_MANAGE="../tls-ca-manage.sh"
+TLS_CERT_MANAGE="../tls-cert-manage.sh"
 #
-tls-ca-manage.sh acme
+${TLS_CA_MANAGE} create acme
+${TLS_CA_MANAGE} verify acme
 #
 #
-#  Secure self-signed using 521-bit ECDSA
-tls-ca-manage.sh -a ecdsa -k 521 secured-acme
+#  Create a self-signed using 521-bit ECDSA
+${TLS_CA_MANAGE} create -a ecdsa -k 521 secured-acme
+${TLS_CA_MANAGE} verify secured-acme
