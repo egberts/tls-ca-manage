@@ -1201,7 +1201,7 @@ ocsp_url                = ${X509_URL_BASE}/ocsp
 
 [ $CIC_SECTION_NAME ]
 """ > "$CIC_INTERNODE_CONFIG_FILESPEC"  # create file, appends later on
-    write_line_or_no "keyUsage"               "$CNF_CA_EXT_KU" $CIC_INTERNODE_CONFIG_FILESPEC
+    write_line_or_no "keyUsage"               "$CNF_CA_EXT_KU" "$CIC_INTERNODE_CONFIG_FILESPEC"
     write_line_or_no "basicConstraints"       "$CNF_CA_EXT_BC" "$CIC_INTERNODE_CONFIG_FILESPEC"
     write_line_or_no "subjectKeyIdentifier"   "$CNF_CA_EXT_SKI" "$CIC_INTERNODE_CONFIG_FILESPEC"
     write_line_or_no "authorityKeyIdentifier" "$CNF_CA_EXT_AKI" "$CIC_INTERNODE_CONFIG_FILESPEC"
