@@ -30,6 +30,7 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
 * Encryption bit size
   * 4096, 2048, 1024, 521, 512, 384, 256, 224, 192, 128
  * No root account required (enforces **`ssl-cert`** supplemental group)
+ * see actual commands and argument settings via verbosity level 
  * And lastly, correct generation of `openssl.cnf` file with all sections properly crossreferences to each other as well as to other CA nodes' configuration file.
 
 # Required Out-of-Band Setup:
