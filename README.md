@@ -4,7 +4,7 @@ Certificate Authority Management tool, written in bash shell.
 If you have ANY of the following:
 
 * befuddle by myriad of OpenSSL CLI options, particularly encryption
-* perplex by how to cross-set the numerous settings between sections of tge OpenSSL configuration file.
+* perplex by how to cross-set the numerous settings between sections within and between the OpenSSL configuration files.
 * a white lab or clean room
 * many CA nodes needed
 * have a private TLD domain name and infrastructure
@@ -21,7 +21,7 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
   - centralized or OpenSSL traditional
   - Nested CA or flat
 * friendly error-free data entry of all combinations of crypto settings
-* Digest algorithms and correct displaying of available settings of:
+* Digest algorithms:
   * SHA512, SHA384, SHA256, SHA3-256, SHA3-224, SHA1, MD5
 * Cipher algorithms
   * aes128, aes256, aes-256-cbc, aes-128-cbc, des-ede3-cbc, camellia-256-cbc
