@@ -21,7 +21,7 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
   - centralized or OpenSSL traditional
   - Nested CA or flat
 * friendly error-free data entry of all combinations of crypto settings
-* Digest algorithms and correct displaying of available settins of:
+* Digest algorithms and correct displaying of available settings of:
   * SHA512, SHA384, SHA256, SHA3-256, SHA3-224, SHA1, MD5
 * Cipher algorithms
   * aes128, aes256, aes-256-cbc, aes-128-cbc, des-ede3-cbc, camellia-256-cbc
@@ -30,6 +30,7 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
 * Encryption bit size
   * 4096, 2048, 1024, 521, 512, 384, 256, 224, 192, 128
  * No root account required (enforces **`ssl-cert`** supplemental group)
+ * And lastly, correct generation of `openssl.cnf` file with all sections properly crossreferences to each other as well as to other CA nodes' configuration file.
 
 # Required Out-of-Band Setup:
 
