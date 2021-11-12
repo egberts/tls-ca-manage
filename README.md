@@ -129,7 +129,14 @@ So, to make it easy, the syntax is about the CA node itself;  A simple filename 
 
 Coupled that with three basic commands:  Create, renew, and verify.
 
-That's how simple it should be.
+That's how simple it should be to create the entire CA ecosystem:
+```
+  tls-ca-manage.sh create root
+  tls-ca-manage.sh create -p root intermediate-ca
+  tls-cert-manage.sh create -p intermediate-ca my-acme-company
+```
+ 
+Full syntax is:
 ```
 Usage:  ./tls-ca-manage.sh
         [ --help|-h ] [ --verbosity|-v ] [ --force-delete|-f ]
