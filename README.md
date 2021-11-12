@@ -91,7 +91,7 @@ File organization for nested CAs also come in two flavors:
 At first, I defaulted it to this nested-tree because OpenSSL team seems to like this, until a new layout came along.
 
 ## New Directory Layout
-Later, I ran into an awesome [webpage](https://pki-tutorial.readthedocs.io/en/latest/expert/index.html#)  on Expert PKI (diagram and all).  But I noticed the new directory layout (diametrically different than traditional OpenSSL directory layout).  I'm  going to call it the 'centralized' directory layout.
+Later, I ran into an awesome [webpage](https://pki-tutorial.readthedocs.io/en/latest/expert/index.html#)  on Expert PKI (diagram and all).  But I noticed the new directory layout (diametrically different than traditional OpenSSL directory layout).  I'm  going to call it the 'centralized' directory layout.  Edited: I've later learned that Sweden `.se` TLD team effort is behind this design.
 
 I too incorporated the new centralized directory layout into this `tls-ca-manage.sh` tool.  It could do either approach.  I defaulted it to the new centralized ones.
 
