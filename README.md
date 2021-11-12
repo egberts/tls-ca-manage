@@ -1,4 +1,4 @@
-"ROOT All The Things!"
+**"ROOT All The Things!"**
 
 <img src="https://github.com/egberts/tls-ca-manage/blob/36aa744f64851b0422b86eb04b570a45e79d23c5/2204FB39-2D08-4EE9-9B0B-C879C10B8441.gif" alt="tls-ca-manage logo" width="200"/>
 
@@ -42,7 +42,7 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
   * RSA, ECDSA, ED25519, POLY1305
 * Encryption bit size
   * 4096, 2048, 1024, 521, 512, 384, 256, 224, 192, 128
- * No root account required (enforces **`ssl-cert`** supplemental group)
+ * No UNIX root account required (enforces **`ssl-cert`** supplemental group)
  * see actual commands and argument settings via verbosity level 
  * And lastly, correct generation of `openssl.cnf` file with all sections properly crossreferences to each other as well as to other CA nodes' configuration file.
 
