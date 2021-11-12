@@ -46,7 +46,7 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
  * see actual commands and argument settings via verbosity level 
  * And lastly, correct generation of `openssl.cnf` file with all sections properly crossreferences to each other as well as to other CA nodes' configuration file.
 
-# Required Out-of-Band Setup:
+# Install
 
     sudo chown root:ssl-cert /etc/ssl
     sudo chmod g+rxw,o-rwx /etc/ssl
@@ -54,9 +54,9 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
 
 No install script purposely given here; this is serious admin effort here.  May impact other servers' improperly configured but direct access to `/etc/ssl`.
 
-My belief is that `/etc/ssl` was never intended for direct access by end-servers' TLS/SSL.  Just a holding area of certificates.
+My belief is that `/etc/ssl` was never intended for a direct access by end-servers' need for TLS/SSL; just a holding area of certificates.
 
-I've tried to give 'ssl-cert' group access to end-server(s) but realized that would be giving away the TLS/SSL store too much.
+I've tried to give 'ssl-cert' group access to end-server(s) then I realized that would be giving away the TLS/SSL store too much.
 
 You create the appropriate 'private' subdirectory in each of the end-server's /etc/<server-name>/<private-tls> and COPY their server-specific certs over to there.
 
