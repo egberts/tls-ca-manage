@@ -1,7 +1,7 @@
 "ROOT All The Things!"
 
 
-Designed to make CA PEM files correctly in the fewest steps possible with the fewest errors possible.  
+Designed to make CA PEM files correctly in the fewest steps possible.  
 
 Beats EasyRSA.  Beats all online CA providers. Definitely beats using OpenSSL directly.
 
