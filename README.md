@@ -10,7 +10,7 @@ Makes a CA PEM file correctly in the fewest steps possible.
 
 Beats EasyRSA.  Beats all online CA providers. Definitely beats using OpenSSL directly.
 
-That's how simple it should be to create the entire CA ecosystem:
+That's how simple it should be to create a CA ecosystem:
 ```
   tls-ca-manage.sh create root
   tls-ca-manage.sh create -p root intermediate-ca
