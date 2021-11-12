@@ -17,7 +17,7 @@ That's how simple it should be to create a CA ecosystem:
   tls-cert-manage.sh create -p intermediate-ca my-acme-company
 ```
 
-# tls-ca-managed
+# What else can tls-ca-manage do?
 
 Certificate Authority Management tool, written in bash shell.
 
