@@ -10,6 +10,13 @@ Makes a CA PEM file correctly in the fewest steps possible.
 
 Beats EasyRSA.  Beats all online CA providers. Definitely beats using OpenSSL directly.
 
+That's how simple it should be to create the entire CA ecosystem:
+```
+  tls-ca-manage.sh create root
+  tls-ca-manage.sh create -p root intermediate-ca
+  tls-cert-manage.sh create -p intermediate-ca my-acme-company
+```
+
 # tls-ca-managed
 
 Certificate Authority Management tool, written in bash shell.
@@ -129,12 +136,6 @@ So, to make it easy, the syntax is about the CA node itself;  A simple filename 
 
 Coupled that with three basic commands:  Create, renew, and verify.
 
-That's how simple it should be to create the entire CA ecosystem:
-```
-  tls-ca-manage.sh create root
-  tls-ca-manage.sh create -p root intermediate-ca
-  tls-cert-manage.sh create -p intermediate-ca my-acme-company
-```
  
 Full syntax is:
 ```
