@@ -3,13 +3,11 @@
 
 Designed to make CA PEM files correctly in the fewest steps possible.  
 
-Beats EasyRSA.  Beats all online CA providers. Definitely beats using OpenSSL directly.
-
 * so simple, it makes self-signed certificates; 
 * so flexible, it creates the widest variety of PEM files.
 * so advanced, that I used it to recreate entire Internet full of secured websites in my closed-network lab.
 
-
+Beats EasyRSA.  Beats all online CA providers. Definitely beats using OpenSSL directly.
 
 # tls-ca-managed
 
