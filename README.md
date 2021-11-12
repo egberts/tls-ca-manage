@@ -1,6 +1,5 @@
 "ROOT All The Things!"
 
-Certificate Authority Management tool, written in bash shell.
 
 Designed to make CA PEM files correctly in the fewest steps possible with the fewest errors possible.  
 
@@ -13,6 +12,8 @@ Beats EasyRSA.  Beats all online CA providers. Definitely beats using OpenSSL di
 
 
 # tls-ca-managed
+
+Certificate Authority Management tool, written in bash shell.
 
 If you have ANY of the following:
 
