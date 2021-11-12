@@ -2,7 +2,7 @@
 
 <img src="https://github.com/egberts/tls-ca-manage/blob/36aa744f64851b0422b86eb04b570a45e79d23c5/2204FB39-2D08-4EE9-9B0B-C879C10B8441.gif" alt="tls-ca-manage logo" width="200"/>
 
-Designed to make CA PEM files correctly in the fewest steps possible.  
+Makes a CA PEM file correctly in the fewest steps possible.  
 
 * so simple, it makes self-signed certificates; 
 * so flexible, it creates the widest variety of PEM files.
