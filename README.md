@@ -19,7 +19,7 @@ That's how simple it should be to create a CA ecosystem:
 
 # What else can tls-ca-manage do?
 
-Certificate Authority Management tool, written in bash shell.
+Certificate Authority Management tool is witten in bash shell.  Runs on any platform that runs OpenSSL.
 
 If you have ANY of the following:
 
