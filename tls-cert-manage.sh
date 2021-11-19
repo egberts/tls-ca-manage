@@ -132,9 +132,15 @@
 #
 #     Inspired by: https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
 #
+ADD_SAN_DATA_ENTRY=0
+X509_PREFIX=""
+X509_SUFFIX=""
+CNF_CA_EXT_EXTRA=""
+CNF_CA_EXT_EXTRA_A=()
 
 function cmd_show_syntax_usage {
-    echo """Usage:
+  cat << SYNTAX_EOF | more
+ Usage:
   $0 create [options] <cert-name> <cert-type> <ca-name>
   $0 renew [options] <cert-name> <ca-name>
   $0 revoke [options] <cert-name> <ca-name> <reason>
@@ -143,7 +149,8 @@ function cmd_show_syntax_usage {
 
   cert-name: A simple filename for this certificate
   cert-type: This certificate type
-  ca-name: Simple name of CA in which to sign certificate against with
+  ca-name: Simple name of CA in which to sign certificate against with.
+           Alphanumeric, dash, and underscore characters supported.
 
   options:
         [ --help|-h ] [ --verbosity|-v ] [ --force-delete|-f ]
@@ -160,9 +167,11 @@ function cmd_show_syntax_usage {
 <ca-type>: server, client, email, ocsp, timestamping, security, codesign
 
 Default settings:
-  Top-level SSL directory: $DEFAULT_SSL_DIR  Cipher: $DEFAULT_PEER_SIGNATURE
-  Digest: $DEFAULT_MESSAGE_DIGEST Keysize: $DEFAULT_KEYSIZE_BITS
-"""
+  Top-level SSL directory: $DEFAULT_SSL_DIR
+  Cipher: $DEFAULT_PEER_SIGNATURE
+  Digest: $DEFAULT_MESSAGE_DIGEST
+  Keysize: $DEFAULT_KEYSIZE_BITS
+SYNTAX_EOF
   exit 1
 }
 # Create a top-level or intermediate certificate authority (CA)
@@ -183,7 +192,6 @@ DEFAULT_PEER_SIGNATURE="rsa"
 DEFAULT_SERIAL_ID_HEX=1000
 DEFAULT_SSL_DIR="/etc/ssl"
 DEFAULT_VERBOSITY=0
-DEFAULT_DRY_RUN=
 DEFAULT_USER_NAME=${USER}  # tells most IDE syntax checker to say that $USER is defined
 # No DEFAULT_ROOT_CA_NAME
 # DEFAULT_INT_CA_NAME="network"
@@ -193,7 +201,6 @@ DEFAULT_FILETYPE_KEY="key"   # sometimes .private
 DEFAULT_FILETYPE_CSR="csr"   # sometimes .req, .request (PKCS#10)
 DEFAULT_FILETYPE_CERT="crt"  # sometimes .pem, .cert, .cer  (PKCS#7)
 DEFAULT_FILETYPE_CRL="crl"   # sometimes .revoke
-DEFAULT_FILETYPE_PFX="pfx"   # sometimes .p12 (PKCS#12)
 
 DEFAULT_OFSTD_LAYOUT="centralized"
 DEFAULT_OFSTD_DIR_TREE_TYPE="flat"
@@ -208,19 +215,19 @@ DEFAULT_CA_X509_OU="Trust Division"
 DEFAULT_CA_X509_EMAIL="ca.example@${DEF_DOMAIN}"
 # Do not use HTTPS in X509_CRL (Catch-22)
 DEFAULT_CA_X509_CRL="http://${DEF_DOMAIN}/ca/example-crl.$DEFAULT_FILETYPE_CERT"
-DEFAULT_CA_X509_URL_BASE="http://${DEF_DOMAIN}/ca"
-DEFAULT_CA_X509_URL_OCSP="http://ocsp.${DEF_DOMAIN}:9080"
+# DEFAULT_CA_X509_URL_BASE="http://${DEF_DOMAIN}/ca"
+# DEFAULT_CA_X509_URL_OCSP="http://ocsp.${DEF_DOMAIN}:9080"
 
-DEFAULT_INTCA_X509_COUNTRY="US"
-DEFAULT_INTCA_X509_STATE=""
-DEFAULT_INTCA_X509_LOCALITY=""
-DEFAULT_INTCA_X509_COMMON="ACME Internal Intermediate CA B2"
-DEFAULT_INTCA_X509_ORG="ACME Networks"
-DEFAULT_INTCA_X509_OU="Semi-Trust Department"
-DEFAULT_INTCA_X509_EMAIL="ca.subroot@${DEF_DOMAIN}"
-DEFAULT_INTCA_X509_CRL="http://${DEF_DOMAIN}/subroot-ca.crl"
-DEFAULT_INTCA_X509_URL_BASE="http://${DEF_DOMAIN}/ca/subroot"
-DEFAULT_INTCA_X509_URL_OCSP="http://ocsp.${DEF_DOMAIN}:9080"
+# DEFAULT_INTCA_X509_COUNTRY="US"
+# DEFAULT_INTCA_X509_STATE=""
+# DEFAULT_INTCA_X509_LOCALITY=""
+# DEFAULT_INTCA_X509_COMMON="ACME Internal Intermediate CA B2"
+# DEFAULT_INTCA_X509_ORG="ACME Networks"
+# DEFAULT_INTCA_X509_OU="Semi-Trust Department"
+# DEFAULT_INTCA_X509_EMAIL="ca.subroot@${DEF_DOMAIN}"
+# DEFAULT_INTCA_X509_CRL="http://${DEF_DOMAIN}/subroot-ca.crl"
+# DEFAULT_INTCA_X509_URL_BASE="http://${DEF_DOMAIN}/ca/subroot"
+# DEFAULT_INTCA_X509_URL_OCSP="http://ocsp.${DEF_DOMAIN}:9080"
 
 
 function input_data {
@@ -244,7 +251,7 @@ function directory_file_layout {
     # [ $5 - parent issuing authority simplified filename ]
 
     DFL_OFSTD_LAYOUT="$1"  # traditional | centralized
-    DFL_OFSTD_DIR_TREE_TYPE="$2"  # hierarchy | flat
+    # DFL_OFSTD_DIR_TREE_TYPE="$2"  # hierarchy | flat
     DFL_SSL_DIR="$3"
     DFL_CERT_NAME="$4"
     DFL_PARENT_IA_NAME="$5"
@@ -255,7 +262,7 @@ function directory_file_layout {
     DB_DNAME="db"
     NEWCERTS_DNAME="newcerts"
 
-    SSL_CERTS_DIR="${DFL_SSL_DIR}/${CERTS_DNAME}"  # /etc/ssl/certs, always
+    # SSL_CERTS_DIR="${DFL_SSL_DIR}/${CERTS_DNAME}"  # /etc/ssl/certs, always
     if [[ "$DFL_OFSTD_LAYOUT" == "traditional" ]]; then
         # Template filename
         DIRNAME_PREFIX="ca-"
@@ -289,10 +296,14 @@ function directory_file_layout {
         CERT_FILENAME_PREFIX=""
         CERT_FILENAME_SUFFIX=""
 
+        # shellcheck disable=SC2034
         CERT_X509_PREFIX=""
+        # shellcheck disable=SC2034
         CERT_X509_SUFFIX="_ca"
 
+        # shellcheck disable=SC2034
         X509_PREFIX=""
+        # shellcheck disable=SC2034
         X509_SUFFIX="_ca"
 
         PEM_FILETYPE_SUFFIX=""
@@ -312,11 +323,11 @@ function directory_file_layout {
         # Inspired by readthedocs
         echo ""
         CERT_FNAME="${CERT_FILENAME_PREFIX}${CERT_NAME}${CERT_FILENAME_SUFFIX}"
-        CERT_SNAME="${CERT_X509_PREFIX}${CERT_NAME}${CERT_X509_SUFFIX}"
+        # CERT_SNAME="${CERT_X509_PREFIX}${CERT_NAME}${CERT_X509_SUFFIX}"
         CERT_PATH_FNAME="${DIRNAME_PREFIX}${CERT_NAME}${DIRNAME_SUFFIX}"
 
         PARENT_IA_FNAME="${FILENAME_PREFIX}${PARENT_IA_NAME}${FILENAME_SUFFIX}"
-        PARENT_IA_SNAME="${X509_PREFIX}${PARENT_IA_NAME}${X509_SUFFIX}"
+        # PARENT_IA_SNAME="${X509_PREFIX}${PARENT_IA_NAME}${X509_SUFFIX}"
         PARENT_IA_PATH_FNAME="${DIRNAME_PREFIX}${PARENT_IA_NAME}${DIRNAME_SUFFIX}"
 
         CRT_CERTS_DIR="$SSL_DIR/$CERTS_DNAME"
@@ -324,11 +335,11 @@ function directory_file_layout {
     elif [[ "$OFSTD_DIR_TREE_TYPE" == "hierarchy" ]]; then
         # Inspired by traditional OpenSSL
         CERT_FNAME="${CERT_FILENAME_PREFIX}${CERT_NAME}${CERT_FILENAME_SUFFIX}"
-        CERT_SNAME="${X509_PREFIX}${CERT_NAME}${X509_SUFFIX}"
+        # CERT_SNAME="${X509_PREFIX}${CERT_NAME}${X509_SUFFIX}"
         CERT_PATH_FNAME="${DIRNAME_PREFIX}${CERT_NAME}${DIRNAME_SUFFIX}"
 
         PARENT_IA_FNAME="${FILENAME_PREFIX}${PARENT_IA_NAME}${FILENAME_SUFFIX}"
-        PARENT_IA_SNAME="${X509_PREFIX}${PARENT_IA_NAME}${X509_SUFFIX}"
+        # PARENT_IA_SNAME="${X509_PREFIX}${PARENT_IA_NAME}${X509_SUFFIX}"
 
         PARENT_IA_PATH_FNAME="${DIRNAME_PREFIX}${PARENT_IA_NAME}${DIRNAME_SUFFIX}"
 
@@ -372,10 +383,10 @@ function directory_file_layout {
         PARENT_IA_SERIAL_DB_DIR="$PARENT_IA_DB_DIR"
         PARENT_IA_CRL_DB_DIR="$PARENT_IA_DB_DIR"
 
-        CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/${CERT_NODE_TYPE}_${CERT_FNAME}_${PARENT_IA_FNAME}_req.cnf"
-        CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/${CERT_NODE_TYPE}_${CERT_FNAME}_${PARENT_IA_FNAME}_reqext.cnf"
+        CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}__${CERT_NODE_TYPE}__${CERT_FNAME}__req.cnf"
+        CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}__${CERT_NODE_TYPE}__${CERT_FNAME}__reqext.cnf"
         PARENT_IA_OPENSSL_CNF_CA_FILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}.cnf"
-        PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}_${CERT_NODE_TYPE}-${CERT_FNAME}_ext.cnf"
+        PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}__${CERT_NODE_TYPE}-${CERT_FNAME}__ext.cnf"
     else
         CERT_EXT_DIR="$DFL_SSL_DIR/etc"
         CERT_CRL_DIR="$DFL_SSL_DIR/$CRL_DNAME"
@@ -401,10 +412,10 @@ function directory_file_layout {
         PARENT_IA_SERIAL_DB_DIR="$PARENT_IA_DIR/$CERT_DB_DNAME"
         PARENT_IA_CRL_DB_DIR="$PARENT_IA_DIR/$CERT_DB_DNAME"
 
-        CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/${CERT_NODE_TYPE}_${CERT_FNAME}_${PARENT_IA_FNAME}_req.cnf"
-        CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/${CERT_NODE_TYPE}_${CERT_FNAME}_${PARENT_IA_FNAME}_reqext.cnf"
+        CERT_OPENSSL_CNF_REQ_FILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}__${CERT_NODE_TYPE}__${CERT_FNAME}__req.cnf"
+        CERT_OPENSSL_CNF_REQ_EXTFILE="$CERT_EXT_DIR/${PARENT_IA_FNAME}__${CERT_NODE_TYPE}__${CERT_FNAME}__reqext.cnf"
         PARENT_IA_OPENSSL_CNF_CA_FILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}.cnf"
-        PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}_${CERT_NODE_TYPE}-${CERT_FNAME}_ext.cnf"
+        PARENT_IA_OPENSSL_CNF_CA_EXTFILE="$PARENT_IA_EXT_DIR/${PARENT_IA_FNAME}__${CERT_NODE_TYPE}__${CERT_FNAME}__ext.cnf"
     fi
 
     if [[ "$VERBOSITY" -gt 1 ]]; then
@@ -434,9 +445,9 @@ function directory_file_layout {
         # Traditional CSR is user-defined, we automate it here
         CSR_FNAME_PREFIX="ca-csr"
         CERT_FNAME_PREFIX="cacert"
-        CERT_SERIAL_FNAME="serial"
-        CERT_INDEX_FNAME="index.txt"
-        CERT_CRLNUMBER_FNAME="crlnumber"
+        # CERT_SERIAL_FNAME="serial"
+        # CERT_INDEX_FNAME="index.txt"
+        # CERT_CRLNUMBER_FNAME="crlnumber"
         PARENT_IA_SERIAL_FNAME="serial"
         PARENT_IA_INDEX_FNAME="index.txt"
         PARENT_IA_CRLNUMBER_FNAME="crlnumber"
@@ -455,7 +466,7 @@ function directory_file_layout {
         CERT_FFNAME_CRL="$CERT_FILENAME_SUFFIX.$DEFAULT_FILETYPE_CRL"  # '-ca.crl'
 
         PARENT_IA_FFNAME_KEY="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_KEY"  # '-ca.key'
-        PARENT_IA_FFNAME_CSR="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CSR"  # '-ca.csr'
+        # PARENT_IA_FFNAME_CSR="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CSR"  # '-ca.csr'
         PARENT_IA_FFNAME_CERT="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CERT"  # '-ca.crt'
         PARENT_IA_FFNAME_CRL="$FILENAME_SUFFIX.$DEFAULT_FILETYPE_CRL"  # '-ca.crl'
 
@@ -595,7 +606,14 @@ function data_entry_generic {
     X509_ORG="$ID_INPUT_DATA"
     input_data "Org. Unit/Section/Division: " "$X509_OU"
     X509_OU="$ID_INPUT_DATA"
-    input_data "Common Name: " "$X509_COMMON"
+
+    if [ "$NODE_TYPE" == "server" ]; then
+      echo ""
+      echo "Enter in the domain name into Common Name (NO WILDCARD)"
+      input_data "Common Name: " "$X509_COMMON"
+    else
+      input_data "Common Name: " "$X509_COMMON"
+    fi
     X509_COMMON="$ID_INPUT_DATA"
     input_data "Country (2-char max.): " "$X509_COUNTRY"
     X509_COUNTRY="$ID_INPUT_DATA"
@@ -616,22 +634,52 @@ function data_entry_generic {
     X509_CRL="${X509_URL_BASE}/${CERT_CRL_FNAME}"
     input_data "CRL URL: " "$X509_CRL"
     X509_CRL="$ID_INPUT_DATA"
+
+    if [ "$NODE_TYPE" == "server" ]; then
+      CNF_CA_EXT_EXTRA_A+=("[alt_names]")
+      echo ""
+      echo "This is a SERVER type certificate"
+      echo "   First we will put in all variants of domain names in,"
+      echo "   Then we will put in all variants of IP address in."
+      echo "   Hit ENTER to quit."
+      echo "NOTE: Domain wildcard allowed here"
+      idx=1
+      while true; do
+        read -rp "Enter in domain name: "
+        if [ -z "$REPLY" ]; then
+          break;
+        fi
+        REPLY="$(echo "$REPLY" | awk '{ print tolower($1) }')"
+        CNF_CA_EXT_EXTRA_A+=("DNS.$idx = $REPLY")
+        ((idx++))
+      done
+      echo ""
+      echo "   Hit ENTER to quit."
+      echo "NOTE: No slash, CIDR nor subnet allowed; just plain IP address format"
+      idx=1
+      while true; do
+        read -rp "Enter in IP address: "
+        if [ -z "$REPLY" ]; then
+          break;
+        fi
+        REPLY="$(echo "$REPLY" | awk '{ print tolower($1) }')"
+        CNF_CA_EXT_EXTRA_A+=("IP.$idx = $REPLY")
+        ((idx++))
+      done
+      echo "CNF_CA_EXT_EXTRA_A[]: ${CNF_CA_EXT_EXTRA_A[*]}"
+    fi
 }
 
 
 
-# Usage: get_x509v3_extension_by_cert_type <ca_type> <pathlen>
+# Usage: get_x509v3_extension_by_cert_type <ca_type>
 function get_x509v3_extension_by_cert_type {
+  ADD_SAN_DATA_ENTRY=0
   GXEBCT_CA_TYPE=$1
-  GXEBCT_PATHLEN_COUNT=$2
-  [[ -n ${GXEBCT_PATHLEN_COUNT} ]] || GXEBCT_PATHLEN_COUNT=-1
-  if [[ ${GXEBCT_PATHLEN_COUNT} -ge 0 ]]; then
-    GXEBCT_PATHLEN_OPTION=",pathlen:$GXEBCT_PATHLEN_COUNT"
-  else
-    GXEBCT_PATHLEN_OPTION=""
-  fi
   case "$GXEBCT_CA_TYPE" in
     server)
+      # shellcheck disable=SC2034
+      ADD_SAN_DATA_ENTRY=1
       CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"
       CNF_REQ_EXT_BC="CA:false"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -642,12 +690,12 @@ function get_x509v3_extension_by_cert_type {
       # Need to remove 'msSGC' from extendedKeyUsage, but no citation
       CNF_REQ_EXT_EKU="serverAuth,clientAuth"
       # CNF_REQ_EXT_SAN="\$ENV::SAN"  # subjectAltName
-      CNF_REQ_EXT_SAN=""  # subjectAltName
+      CNF_REQ_EXT_SAN="@alt_names"  # subjectAltName
       # CNF_REQ_EXT_AIA="@ocsp_info"
       # CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_AIA=""
       CNF_REQ_EXT_CRL=""
-      CNF_REQ_EXT_EXTRA=""
+      # CNF_REQ_EXT_EXTRA=""
       # signing-ca.cnf/[server_ext]
       # email-ca.cnf/[server_ext]
       CNF_CA_EXT_KU="critical,digitalSignature"
@@ -674,7 +722,7 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_CRL=""
-      CNF_REQ_EXT_EXTRA=""
+      # CNF_REQ_EXT_EXTRA=""
       # email-ca.cnf/[client_ext]
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"
@@ -695,7 +743,7 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_SAN=""  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_CRL=""
-      CNF_REQ_EXT_EXTRA=""
+      # CNF_REQ_EXT_EXTRA=""
       ;;
     ocsp)
       CNF_REQ_EXT_KU="critical,digitalSignature"
@@ -706,7 +754,7 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_SAN=""  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_CRL=""
-      CNF_REQ_EXT_EXTRA=""
+      # CNF_REQ_EXT_EXTRA=""
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
@@ -726,7 +774,7 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_CRL=""
-      CNF_REQ_EXT_EXTRA=""
+      # CNF_REQ_EXT_EXTRA=""
       # signing-ca.cnf/[email_ext]
       # email-ca.cnf/[email_ext]
       CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
@@ -737,7 +785,7 @@ function get_x509v3_extension_by_cert_type {
       CNF_CA_EXT_SAN=""  # subjectAltName
       CNF_CA_EXT_AIA="@issuer_info"
       CNF_CA_EXT_CRL=""
-      CNF_CA_EXT_EXTRA=""
+      # CNF_CA_EXT_EXTRA=""
     ;;
     # encryption supports 802.1ar, Microsoft Encrypted File System
     encryption)
@@ -752,7 +800,7 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_CRL=""
-      CNF_REQ_EXT_EXTRA=""
+      # CNF_REQ_EXT_EXTRA=""
       ;;
     identity)  # there's identity-ca and identity, this here is identity-ca
       CNF_REQ_EXT_KU="critical,digitalSignature"
@@ -764,7 +812,7 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_SAN="email:move"  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"
       CNF_REQ_EXT_CRL=""
-      CNF_REQ_EXT_EXTRA=""
+      # CNF_REQ_EXT_EXTRA=""
       ;;
     codesign)
       CNF_REQ_EXT_KU="critical,digitalSignature"
@@ -775,7 +823,7 @@ function get_x509v3_extension_by_cert_type {
       CNF_REQ_EXT_SAN=""  # subjectAltName
       CNF_REQ_EXT_AIA="@issuer_info"  # authorityInfoAccess
       CNF_REQ_EXT_CRL=""
-      CNF_REQ_EXT_EXTRA=""
+      # CNF_REQ_EXT_EXTRA=""
       # software-ca.cnf/[codesign_ext]
       CNF_CA_EXT_KU="critical,digitalSignature"
       CNF_CA_EXT_BC="CA:false"  # basicConstraint
@@ -785,14 +833,13 @@ function get_x509v3_extension_by_cert_type {
       CNF_CA_EXT_SAN=""  # subjectAltName
       CNF_CA_EXT_AIA="@issuer_info"  # authorityInfoAccess
       CNF_CA_EXT_CRL=""
-      CNF_CA_EXT_EXTRA=""
+      # CNF_CA_EXT_EXTRA=""
       ;;
     *)
       echo "Invalid '$GXEBCT_CA_TYPE' option"
       ;;
   esac
   unset GXEBCT_CA_TYPE
-  unset GXEBCT_PATHLEN_COUNT
 }
 
 function write_line_or_no
@@ -811,15 +858,16 @@ function write_line_or_no
 # Usage: create_cert_config
 #                                <section_name> \
 #                                <internode_filespec>
-function create_generic_cert_req_config_file
+function write_generic_cert_req_config_file
 {
   CGCRCF_SECTION_NAME=$1
   CGCRCF_CNFFILE=$2
   CGCRCF_CURRENT_TIMESTAMP=$(date)
-  echo """#
+  echo "Creating $CGCRCF_CNFFILE file ..."
+  cat << CERT_REQ_EOF | tee "$CGCRCF_CNFFILE" >/dev/null
 # File: $CGCRCF_CNFFILE
 # Created on: $CGCRCF_CURRENT_TIMESTAMP
-# Generated by: $0/create_generic_cert_req_config_file()
+# Generated by: $0/write_generic_cert_req_config_file()
 #
 # Description:
 #    Create generic Certificate Request main configuration file.
@@ -846,7 +894,6 @@ function create_generic_cert_req_config_file
 #    ${CERT_NAME}:    this node
 #
 [ default ]
-SAN                     = DNS:${DEF_DOMAIN}
 base_url                = ${X509_URL_BASE}        # CA base URL
 aia_url                 = ${X509_URL_BASE}/${IA_CERT_FNAME}     # CA certificate URL
 crl_url                 = ${X509_CRL}     # CRL distribution point
@@ -890,7 +937,27 @@ commonName_max                  = 64
 emailAddress                    = Email Address
 emailAddress_default            = \"$X509_EMAIL\"
 emailAddress_max                = 64
+CERT_REQ_EOF
 
+#  # Break apart domain name into domain labels
+#  X509_COMMON_LIST="$(cat "$X509_COMMON" | sed 's/\./ /g')"
+#
+#  # Adjust for 0-based indices
+#  X509_COMMON_COUNT="$(cat "$X509_COMMON_LIST" | wc -w)"
+#  ((X509_COMMON_COUNT--))
+#
+#  if [ $X509_COMMON_COUNT -ge 0 ]; then
+#    # Reverse the domain labels
+#    X509_COMMON_REVLIST="$(echo "$X509_COMMON_LIST" | awk '{ for (i=NF; i>1; i--) printf("%s ",$i); print $1; }')"
+#
+#    idx=0
+#    for domain_label in $X509_COMMON_REVLIST; do
+#      echo "${idx}.domainComponent = \"${domain_label}\"" >> "$CGCRCF_CNFFILE"
+#      ((idx++))
+#    done
+#  fi
+
+  cat << CERT_REQ_EOF | tee -a "$CGCRCF_CNFFILE" >/dev/null
 # domainComponent is not used by 'identity.conf'
 0.domainComponent               = \"Top-level Domain Name (i.e., com, net, org)\"
 0.domainComponent_default       = \"invalid\"
@@ -899,18 +966,25 @@ emailAddress_max                = 64
 2.domainComponent               = \"Sub-Domain Name (i.e., www, ocsp, or 'blank')\"
 2.domainComponent_default       = \"\"
 
+
 [ $CGCRCF_SECTION_NAME ]
-""" > "$CGCRCF_CNFFILE"  # create file, appends later on
-    write_line_or_no "keyUsage"               "$CNF_REQ_EXT_KU" "$CGCRCF_CNFFILE"
-    write_line_or_no "basicConstraints"       "$CNF_REQ_EXT_BC" "$CGCRCF_CNFFILE"
-    write_line_or_no "subjectKeyIdentifier"   "$CNF_REQ_EXT_SKI" "$CGCRCF_CNFFILE"
-    write_line_or_no "authorityKeyIdentifier" "$CNF_REQ_EXT_AKI" "$CGCRCF_CNFFILE"
-    write_line_or_no "extendedKeyUsage"       "$CNF_REQ_EXT_EKU" "$CGCRCF_CNFFILE"
-    write_line_or_no "subjectAltName"         "$CNF_REQ_EXT_SAN" "$CGCRCF_CNFFILE"
-    write_line_or_no "authorityInfoAccess"    "$CNF_REQ_EXT_AIA" "$CGCRCF_CNFFILE"
-    write_line_or_no "crlDistributionPoints"   "$CNF_REQ_EXT_CRL" "$CGCRCF_CNFFILE"
+CERT_REQ_EOF
+  write_line_or_no "keyUsage"               "$CNF_REQ_EXT_KU" "$CGCRCF_CNFFILE"
+  write_line_or_no "basicConstraints"       "$CNF_REQ_EXT_BC" "$CGCRCF_CNFFILE"
+  write_line_or_no "subjectKeyIdentifier"   "$CNF_REQ_EXT_SKI" "$CGCRCF_CNFFILE"
+  write_line_or_no "authorityKeyIdentifier" "$CNF_REQ_EXT_AKI" "$CGCRCF_CNFFILE"
+  write_line_or_no "extendedKeyUsage"       "$CNF_REQ_EXT_EKU" "$CGCRCF_CNFFILE"
+  write_line_or_no "subjectAltName"         "$CNF_REQ_EXT_SAN" "$CGCRCF_CNFFILE"
+  write_line_or_no "authorityInfoAccess"    "$CNF_REQ_EXT_AIA" "$CGCRCF_CNFFILE"
+  write_line_or_no "crlDistributionPoints"   "$CNF_REQ_EXT_CRL" "$CGCRCF_CNFFILE"
+  if [ -n "$CNF_CA_EXT_EXTRA" ]; then
     echo "$CNF_CA_EXT_EXTRA" >> "$CGCRCF_CNFFILE"
-    echo "#
+  fi
+  for idx in $(seq 0 ${#CNF_CA_EXT_EXTRA_A[@]} | xargs); do
+    echo "${CNF_CA_EXT_EXTRA_A[$idx]}" >> "$CGCRCF_CNFFILE"
+  done
+
+  cat << RCF_CNF_EOF | tee -a "$CGCRCF_CNFFILE" >/dev/null
 [ crl_ext ]
 authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
@@ -924,25 +998,26 @@ caIssuers;URI.0         = \$aia_url
 
 [ crl_info ]
 URI.0                   = \$crl_url
-    """ >> "$CGCRCF_CNFFILE"
-    unset CIC_SECTION_NAME
-    unset CIC_CONFIG_FILESPEC
-    unset CIC_TIMESTAMP
+RCF_CNF_EOF
+  unset CIC_SECTION_NAME
+  unset CIC_CONFIG_FILESPEC
+  unset CIC_TIMESTAMP
 }
 
 
 # Creates an extension file that details the
 # relatioship between parent CA and its child CA
 #
-function create_generic_ca_extension_config_file
+function write_generic_ca_extension_config_file
 {
   CCEC_SECTION_NAME="$1"
   CCEC_EXTFILE="$2"
   CCEC_CURRENT_TIMESTAMP=$(date)
-  echo """#
+  echo "**************Creating $CCEC_EXTFILE file ..."
+  cat << CA_EXT_EOF | tee "$CCEC_EXTFILE" >/dev/null
 # File: $CCEC_EXTFILE
 # Created on: $CCEC_CURRENT_TIMESTAMP
-# Generated by: $0/create_generic_ca_extension_config_file()
+# Generated by: $0/write_generic_ca_extension_config_file()
 #
 # Description:
 #    Generic CA certificate extension configuration file.
@@ -959,7 +1034,7 @@ function create_generic_ca_extension_config_file
 # Usage:
 #    openssl ca -config $PARENT_IA_OPENSSL_CNF_CA_FILE \\
 #               -extfile $CCEC_EXTFILE \\
-#               -extfension $CCEC_SECTION_NAME \\
+#               -extension $CCEC_SECTION_NAME \\
 #               ...
 #
 # Section Name breakdown:
@@ -979,7 +1054,7 @@ ocsp_url                = ${X509_URL_OCSP}
 # But having CA_TYPE-CA_NAME makes it possible to support
 # different class of the same CA-TYPE by using CA_NAMe as a unique label
 [ $CCEC_SECTION_NAME ]
-""" > "$CCEC_EXTFILE"
+CA_EXT_EOF
     write_line_or_no "keyUsage"               "$CNF_CA_EXT_KU" "$CCEC_EXTFILE"
     write_line_or_no "basicConstraints"       "$CNF_CA_EXT_BC" "$CCEC_EXTFILE"
     write_line_or_no "subjectKeyIdentifier"   "$CNF_CA_EXT_SKI" "$CCEC_EXTFILE"
@@ -988,8 +1063,8 @@ ocsp_url                = ${X509_URL_OCSP}
     write_line_or_no "subjectAltName"         "$CNF_CA_EXT_SAN" "$CCEC_EXTFILE"
     write_line_or_no "authorityInfoAccess"    "$CNF_CA_EXT_AIA" "$CCEC_EXTFILE"
     write_line_or_no "crlDistributionPoints"   "$CNF_CA_EXT_CRL" "$CCEC_EXTFILE"
-    echo "$CNF_CA_EXT_EXTRA" >> "$CCEC_EXTFILE"
-    echo """#
+    cat << EXTFILE_EOF | tee -a "$CCEC_EXTFILE" >/dev/null
+#
 [ ocsp_info ]
 caIssuers;URI.0         = \$aia_url
 OCSP;URI.0              = \$ocsp_url
@@ -1012,7 +1087,7 @@ CipherString = DEFAULT@SECLEVEL=2
 RSA.Certificate = server-rsa.pem
 ECDSA.Certificate = server-ecdsa.pem
 
-""" >> "$CCEC_EXTFILE"
+EXTFILE_EOF
     unset CCEC_SECTION_NAME
     unset CCEC_EXTFILE
     unset CCEC_TIMESTAMP
@@ -1027,6 +1102,7 @@ function cert_create_public_key
     touch_cert_file "$CERT_KEY_PEM"
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CERT_KEY_PEM"
 
+    # shellcheck disable=SC2086
     ${DRY_RUN} ${OPENSSL_GENPKEY} \
         ${OPENSSL_ALGORITHM} \
         -text \
@@ -1066,9 +1142,10 @@ function cert_create_csr
 {
     CCC_SECTION_NAME=$1
     CCC_CERT_CONFIG_FILESPEC=$2
-    CCC_CERT_CONFIG_EXT_FILESPEC=$3
+    # CCC_CERT_CONFIG_EXT_FILESPEC=$3
 
     # Do not use -keyout, we have cert_create_public_key() function for that
+    # shellcheck disable=SC2086
     ${DRY_RUN} ${OPENSSL} req -config "${CCC_CERT_CONFIG_FILESPEC}" \
         -reqexts "$CCC_SECTION_NAME" \
         -new \
@@ -1103,9 +1180,10 @@ function cert_create_csr
 ###############################################
 function cert_create_certificate {
     echo "Creating $CERT_NAME ($NODE_TYPE) certificate ..."
-    CCC_CERT_OPENSSL_CNF_EXTENSION="$1"
+    # CCC_CERT_OPENSSL_CNF_EXTENSION="$1"
     CCC_CERT_OPENSSL_CNF_EXTFILE="$2"
     CCC_CERT_SECTION_NAME="$3"
+    # shellcheck disable=SC2086
     ${DRY_RUN} ${OPENSSL_CA} \
         -batch \
         ${IA_OPENSSL_CA_OPT} \
@@ -1137,6 +1215,7 @@ function cert_create_certificate {
 function cert_create_revocation_list
 {
     echo "Creating $CERT_NODE_TYPE certificate revocation list (CRL)..."
+    # shellcheck disable=SC2086
     ${DRY_RUN} ${OPENSSL_CA} \
         -gencrl \
         -config "$PARENT_IA_OPENSSL_CNF_CA_FILE" \
@@ -1150,6 +1229,7 @@ function ca_extract_signing_request
     ###########################################################
     # We are at the mercy of CA_CERT_PEM being the latest
     # and ALSO in its index.txt file as well.
+    # shellcheck disable=SC2086
     ${DRY_RUN} ${OPENSSL_X509} -x509toreq \
        -in "$CERT_CERT_PEM" \
        -signkey "$CERT_KEY_PEM" \
@@ -1177,6 +1257,7 @@ function ca_renew_certificate
     CRC_CERT_OPENSSL_CNF_EXTFILE="$1"
     CRC_CERT_OPENSSL_CNF_EXTENSION="$2"
     # DO NOT USE 'openssl x509', because it lacks DB accounting
+    # shellcheck disable=SC2086
     ${DRY_RUN} ${OPENSSL_CA} \
         -verbose \
         ${IA_OPENSSL_CA_OPT} \
@@ -1282,13 +1363,13 @@ function cmd_create_cert {
     [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $CERT_NODE_TYPE private key ..."
 
     echo "DEBUG: DEBUG: CA_TYPE: $NODE_TYPE"
-    get_x509v3_extension_by_cert_type "$NODE_TYPE" -1
+    get_x509v3_extension_by_cert_type "$NODE_TYPE"
 
     get_section_names "${NODE_TYPE}" "${PARENT_IA_NAME}"
 
-    create_generic_cert_req_config_file "$SECTION_NAME_REQ" "$CERT_OPENSSL_CNF_REQ_FILE"
+    write_generic_cert_req_config_file "$SECTION_NAME_REQ" "$CERT_OPENSSL_CNF_REQ_FILE"
 
-    create_generic_ca_extension_config_file "$SECTION_NAME_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
+    write_generic_ca_extension_config_file "$SECTION_NAME_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
 
     cert_create_public_key
 
@@ -1297,8 +1378,13 @@ function cmd_create_cert {
         "$CERT_OPENSSL_CNF_REQ_FILE" \
         "$CERT_OPENSSL_CNF_REQ_EXTFILE"
 
+#    cert_create_certificate \
+#        "$PARENT_IA_OPENSSL_CNF_CA_FILE" \
+#        "$PARENT_IA_OPENSSL_CNF_CA_EXTFILE" \
+#        "$SECTION_NAME_CA"
+#
     cert_create_certificate \
-        "$PARENT_IA_OPENSSL_CNF_CA_FILE" \
+        "$CERT_OPENSSL_CNF_REQ_FILE" \
         "$PARENT_IA_OPENSSL_CNF_CA_EXTFILE" \
         "$SECTION_NAME_CA"
 
@@ -1378,11 +1464,11 @@ function cmd_renew_cert {
     ca_extract_signing_request
 
     echo "DEBUG: DEBUG: CA_TYPE: $NODE_TYPE"
-    get_x509v3_extension_by_cert_type "$NODE_TYPE" -1
+    get_x509v3_extension_by_cert_type "$NODE_TYPE"
     get_section_names "${NODE_TYPE}" "${PARENT_IA_NAME}"
 
     # REQ config file should already be created (could pre-exist-check for one here)
-    create_generic_ca_extension_config_file "$SECTION_NAME_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
+    write_generic_ca_extension_config_file "$SECTION_NAME_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
 
     ca_renew_certificate "$CERT_OPENSSL_CNF_REQ_EXTFILE" "$SECTION_NAME_REQ"
 
@@ -1409,7 +1495,7 @@ function cmd_renew_cert {
 ##################################################
 function cmd_revoke_cert {
     # Obtain current serial ID
-    NEXT_SERIAL_ID="$(cat $PARENT_IA_SERIAL_DB)"
+    NEXT_SERIAL_ID="$(cat "$PARENT_IA_SERIAL_DB")"
     hex_decrement "$NEXT_SERIAL_ID"
     CURRENT_SERIAL_ID="$HEX_VALUE_PREV"
 
@@ -1989,7 +2075,8 @@ fi
 # It's stupid that we have to export this OpenSSL configuration filespec
 # If we didn't, it would 'furtively' refer to it's built-in /usr/lib/openssl/openssl.cnf if no '-config' were used as 'strace -f' has shown.
 # We shall have full control over what files that OpenSSL will attempts to open.
-export OPENSSL_CONF="$CERT_OPENSSL_CNF_REQ_FILE"
+export OPENSSL_CONF="$PARENT_IA_OPENSSL_CNF_CA_EXTFILE"
+# CERT_OPENSSL_CNF_REQ_FILE"
 export SSL_CERT_FILE="/dev/null"
 
 # Four separate configuration files are needed for a certificate creation

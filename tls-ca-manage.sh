@@ -216,7 +216,17 @@
 #    format for Internet download of certificates and CRLs.  (Not used here)
 
 function cmd_show_syntax_usage {
-    echo """Usage:  $0
+    echo """Usage:
+  $0 create [options] <ca-name>
+  $0 renew [options] <ca-name>
+  $0 revoke [options] <ca-name>
+  $0 verify [options] <ca-name>
+  $0 help
+
+  ca-name: Simple name of CA in which to sign certificate against with.
+           Alphanumeric, dash, and underscore characters supported.
+
+  options:
         [ --parent-ca|-p ] [-t|--ca-type <ca-type>] \
         [ --help|-h ] [ --verbosity|-v ] [ --force-delete|-f ]
         [ --base-dir|-b <ssl-directory-path> ]
@@ -229,15 +239,16 @@ function cmd_show_syntax_usage {
         [ --openssl|-o <openssl-binary-filespec ]  # (default: $OPENSSL)
         [ --traditional|-T ]
         [ --dry-run|-d ]
-        < create | renew | revoke | verify | help >
-        <ca-name>
+        create | renew | revoke | verify | help
+        <name_of_your_ca>
+
 
 <ca-type>: standalone, root, intermediate, network, identity, component,
            server, client, email, ocsp, timestamping, security, codesign, proxy
 Default settings:
   Top-level SSL directory: $DEFAULT_SSL_DIR  Cipher: $DEFAULT_PEER_SIGNATURE
   Digest: $DEFAULT_MESSAGE_DIGEST Keysize: $DEFAULT_KEYSIZE_BITS
-"""
+""" | more
   exit 1
 }
 # Create a top-level or intermediate certificate authority (CA)
@@ -839,6 +850,8 @@ function get_x509v3_extension_by_ca_type {
       # root-ca.cnf/[root_ca_ext]
       CNF_CA_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
       CNF_CA_EXT_BC="critical,CA:true"  # basicConstraint
+      # TODO: User-prompt for the total depth of Intermediate CAs in advance?
+      #CNF_CA_EXT_BC="critical,CA:true,pathlen:0"  # basicConstraint
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
       CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
       CNF_CA_EXT_EKU=""  # extendedKeyUsage
@@ -850,6 +863,9 @@ function get_x509v3_extension_by_ca_type {
     intermediate)
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
       CNF_REQ_EXT_BC="critical,CA:true"
+      # TODO: Auto-retrieve any 'pahtlen=' from its Root CA, then decrement?
+      # http://www.pkiglobe.org/
+      #CNF_CA_EXT_BC="critical,CA:true,pathlen:0"  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # root-ca.cnf/[root_ca_ext]
       CNF_CA_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
@@ -882,6 +898,7 @@ function get_x509v3_extension_by_ca_type {
       #            CPS: https://pki.goog/repository/
 
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      # No need to auto-retrieve parent CA's pathLen=, this is the end of line
       CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # signing-ca.cnf/[server_ext]
@@ -911,6 +928,7 @@ function get_x509v3_extension_by_ca_type {
       ;;
     client)
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      # No need to auto-retrieve parent CA's pathLen=, this is the end of line
       CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # email-ca.cnf/[client_ext]
@@ -925,6 +943,7 @@ function get_x509v3_extension_by_ca_type {
       ;;
     timestamping)
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      # No need to auto-retrieve parent CA's pathLen=, this is the end of line
       CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # component-ca.cnf/[timestamp_ext]
@@ -952,6 +971,7 @@ function get_x509v3_extension_by_ca_type {
       ;;
     email)
       CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"  # keyUsage
+      # No need to auto-retrieve parent CA's pathLen=, this is the end of line
       CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
       CNF_REQ_EXT_EKU="emailProtection,clientAuth"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
@@ -968,6 +988,7 @@ function get_x509v3_extension_by_ca_type {
     ;;
     encryption)
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      # No need to auto-retrieve parent CA's pathLen=, this is the end of line
       CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # identity-ca.cnf/[encryption_ext]
@@ -984,6 +1005,7 @@ function get_x509v3_extension_by_ca_type {
       ;;
     identity)  # there's identity-ca and identity, this here is identity-ca
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      # No need to auto-retrieve parent CA's pathLen=, this is the end of line
       CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # identity-ca.cnf/[identity_ext]
@@ -997,6 +1019,7 @@ function get_x509v3_extension_by_ca_type {
       ;;
     codesign)
       CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      # No need to auto-retrieve parent CA's pathLen=, this is the end of line
       CNF_REQ_EXT_BC="critical,CA:true,pathlen:0"
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # software-ca.cnf/[codesign_ext]
