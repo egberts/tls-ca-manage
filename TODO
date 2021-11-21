@@ -1,5 +1,46 @@
 Add
 
-1.3.6.1.5.5.7.3.1 to various types of CA certs.
+1.3.6.1.5.5.7.3.1 to various types of intermediate-leaf CA certs.
 
 Reference: https://oidref.com/1.3.6.1.5.5.7.3.2
+
+Execute:
+
+    openssl req \
+            -x509 \
+            -config cert_config \
+            -extensions 'my server exts' \
+            -nodes \
+            -days 365 \
+            -newkey rsa:4096 \
+            -keyout myserver.key \
+            -out myserver.crt
+
+Note the `-extensions 'my server exts' part of `openssl req`.
+
+
+[ req ]
+prompt             = no
+distinguished_name = my dn
+
+[ my dn ]
+# The bare minimum is probably a commonName
+            commonName = secure.example.com
+           countryName = XX
+          localityName = Fun Land
+      organizationName = MyCo LLC LTD INC (d.b.a. OurCo)
+organizationalUnitName = SSL Dept.
+   stateOrProvinceName = YY
+          emailAddress = ssl-admin@example.com
+                  name = John Doe
+               surname = Doe
+             givenName = John
+              initials = JXD
+           dnQualifier = some
+
+[ my server exts ]
+extendedKeyUsage = 1.3.6.1.5.5.7.3.1
+# 1.3.6.1.5.5.7.3.1 can also be spelled serverAuth:
+# extendedKeyUsage = serverAuth
+
+# see x509v3_config for other extensions
