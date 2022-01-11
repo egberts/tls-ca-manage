@@ -750,3 +750,4 @@ certificates should still be the preferred method to secure your public service.
 [xca]: http://sourceforge.net/projects/xca/
 [yourca_tut]: http://www.g-loaded.eu/2005/11/10/be-your-own-ca/
 
+[![Lint Code Base](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml)
