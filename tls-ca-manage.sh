@@ -1957,7 +1957,7 @@ while true; do
         shift;
         MESSAGE_DIGEST=$1
         ;;
-    -n|-nested-ca)
+    -n|--nested-ca)
         OFSTD_DIR_TREE_TYPE="hierarchy"
         ;;
     -o|--openssl)
