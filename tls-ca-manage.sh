@@ -1589,9 +1589,11 @@ function cmd_create_ca {
 
     ca_create_revocation_list
 
-    # Save Parent CA
-    REL_PARENT_IA_PATH=$(realpath --relative-to="$SSL_DIR" "$PARENT_IA_DIR")
-    echo "$REL_PARENT_IA_PATH" > "$IA_DIR/PARENT_CA"
+    if [[ "$NO_PARENT" -ne 1 ]]; then
+        # Save Parent CA
+        REL_PARENT_IA_PATH=$(realpath --relative-to="$SSL_DIR" "$PARENT_IA_DIR")
+        echo "$REL_PARENT_IA_PATH" > "$IA_DIR/PARENT_CA"
+    fi
 
     # Clean up
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_INDEX_DB"
