@@ -1270,7 +1270,6 @@ function ca_create_public_key
 
     ${DRY_RUN} ${OPENSSL_GENPKEY} \
         ${OPENSSL_ALGORITHM} \
-        ${CIPHER_OPTION} \
         -text \
         -outform PEM \
         -out "${IA_KEY_PEM}"
