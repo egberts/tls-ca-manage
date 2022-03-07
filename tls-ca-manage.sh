@@ -1327,7 +1327,7 @@ function ca_create_csr
     if [[ ${VERBOSITY} -ne 0 ]]; then
         # View the CSR in readable format
         openssl asn1parse -in "$IA_CSR_PEM"
-        openssl req -in "$IA_CSR_PEM" -noout -text
+        openssl req ${CIPHER_ARG_PASSIN} -in "$IA_CSR_PEM" -noout -text
     fi
 }
 
@@ -1379,7 +1379,7 @@ function ca_create_revocation_list
     ${DRY_RUN} ${OPENSSL_CA} \
         -gencrl \
         -config "$IA_OPENSSL_CNF" \
-        ${CIPHER_ARG_PASSOUT} \
+        ${CIPHER_ARG_PASSIN} \
         -out "$IA_CRL_PEM"
     RETSTS=$?
     if [[ $RETSTS -ne 0 ]]; then
