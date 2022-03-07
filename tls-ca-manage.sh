@@ -1495,7 +1495,7 @@ function ca_serialization_and_unique_filenames
 function display_ca_certificate {
     THIS_PEM="$1"
     echo "Displaying MD5 of various CA certificates:"
-    echo "$(${OPENSSL_X509} -noout -modulus -in "$THIS_PEM" | ${OPENSSL_MD5}) $THIS_PEM"
+    echo "$(${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$THIS_PEM" | ${OPENSSL_MD5}) $THIS_PEM"
 
     if [[ "$VERBOSITY" -ne 0 ]]; then
         echo "Decoding $PARENT_TYPE_STR certificate:"
@@ -1727,6 +1727,7 @@ function cmd_revoke_ca {
     # -keyfile and -cert are not needed if an openssl.cnf is proper
 
     ${DRY_RUN} ${OPENSSL_X509} -noout -text \
+        ${CIPHER_ARG_PASSIN} \
         -in "$REVOKING_CERT_FILE"
 
     echo -n "Revoke above certificate? (y/N): "
@@ -1811,9 +1812,9 @@ function cmd_verify_ca {
     ########################################
 
     # Checking MD5 hash
-    hashkey=$(${OPENSSL_X509} -noout -in "$IA_CERT_PEM" | \
+    hashkey=$(${OPENSSL_X509} -noout ${CIPHER_ARG_PASSIN} -in "$IA_CERT_PEM" | \
               ${OPENSSL_MD5} )
-    hashcrt=$(${OPENSSL_PKEY} -noout -in "$IA_KEY_PEM" | \
+    hashcrt=$(${OPENSSL_PKEY} -noout ${CIPHER_ARG_PASSIN} -in "$IA_KEY_PEM" | \
               ${OPENSSL_MD5} )
     if [[ "${hashkey}" = "${hashcrt}" ]]; then
         echo "MD5 hash matches"
@@ -1824,11 +1825,13 @@ function cmd_verify_ca {
 
     # Checking SPKIsha256 hash
     hashkey=$(openssl pkey \
+        ${CIPHER_ARG_PASSIN} \
         -in "$IA_KEY_PEM" \
         -pubout \
         -outform der \
         | sha256sum)
     hashcrt=$(openssl x509 \
+        ${CIPHER_ARG_PASSIN} \
         -in "$IA_CERT_PEM" \
         -pubkey \
         | openssl pkey \
@@ -1856,10 +1859,12 @@ function cmd_verify_ca {
         dd if=/dev/urandom of="${TMP}/rnd" bs=32 count=1 status=none
         openssl pkeyutl -sign \
             -inkey "$IA_KEY_PEM" \
+            ${CIPHER_ARG_PASSIN} \
             -in "${TMP}/rnd" \
             -out "${TMP}/sig"
         openssl pkeyutl -verifyrecover \
             -inkey "${TMP}/pubkey.pem" \
+            ${CIPHER_ARG_PASSIN} \
             -in "${TMP}/sig" \
             -out "${TMP}/check"
         if cmp -s "${TMP}/check" "${TMP}/rnd"; then
@@ -1872,11 +1877,11 @@ function cmd_verify_ca {
         rm -rf "${TMP}"
 
         # Extract serial ID from CRT PEM file
-        SERIAL_ID=$(openssl x509 -noout -serial -in $IA_CERT_PEM | awk -F= '{print $2}')
+        SERIAL_ID=$(openssl x509 -noout -serial ${CIPHER_ARG_PASSIN} -in $IA_CERT_PEM | awk -F= '{print $2}')
         CA_NEWCERT_CURRENT_PEM="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${SERIAL_ID}.pem"
 
-        next_pem="$(${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_CURRENT_PEM" | ${OPENSSL_MD5})"
-        current_pem="$(${OPENSSL_X509} -noout -modulus -in "$IA_CERT_PEM" | ${OPENSSL_MD5})"
+        next_pem="$(${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$CA_NEWCERT_CURRENT_PEM" | ${OPENSSL_MD5})"
+        current_pem="$(${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$IA_CERT_PEM" | ${OPENSSL_MD5})"
 
         if [[ "$next_pem" == "$current_pem" ]]; then
             echo "Archive matches"
