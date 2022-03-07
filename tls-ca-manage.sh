@@ -259,6 +259,7 @@ Default settings:
 # Default values (tweakable)
 # DEFAULT_CIPHER="des-ede3-cbc"
 DEFAULT_CIPHER=
+DEFAULT_CIPHER_FILE="${DEFAULT_CIPHER_FILE:-/tmp/openssl-pass.tmp}"
 DEFAULT_CMD_MODE="verify"
 DEFAULT_GROUP_NAME="ssl-cert"
 DEFAULT_KEYSIZE_BITS=4096
@@ -1272,6 +1273,7 @@ function ca_create_public_key
         ${OPENSSL_ALGORITHM} \
         -text \
         -outform PEM \
+        ${CIPHER_ARG_PASS} \
         -out "${IA_KEY_PEM}"
 
     RETSTS=$?
@@ -1291,6 +1293,7 @@ function ca_create_public_key
         # View the private key in readable format
         openssl asn1parse -in "$IA_KEY_PEM"
         openssl pkey \
+            ${CIPHER_ARG_PASSIN} \
             -in "$IA_KEY_PEM" \
             -noout \
             -text
@@ -1303,6 +1306,7 @@ function ca_create_public_key
 function ca_create_csr
 {
     ${DRY_RUN} ${OPENSSL_REQ} -new \
+        ${CIPHER_ARG_PASSIN} \
         -key "$IA_KEY_PEM" \
         "-$MESSAGE_DIGEST" \
         -out "$IA_CSR_PEM"
@@ -1339,6 +1343,7 @@ function ca_create_certificate {
         ${IA_OPENSSL_CA_OPT} \
         -extfile "${IA_OPENSSL_CNF_EXTFILE}" \
         -extensions "${IA_OPENSSL_CNF_EXTENSION}" \
+        ${CIPHER_ARG_PASSIN} \
         -in "$IA_CSR_PEM" \
         -days 3650 \
         -md "$MESSAGE_DIGEST" \
@@ -1374,6 +1379,7 @@ function ca_create_revocation_list
     ${DRY_RUN} ${OPENSSL_CA} \
         -gencrl \
         -config "$IA_OPENSSL_CNF" \
+        ${CIPHER_ARG_PASSOUT} \
         -out "$IA_CRL_PEM"
     RETSTS=$?
     if [[ $RETSTS -ne 0 ]]; then
@@ -1390,6 +1396,7 @@ function ca_extract_signing_request
     # We are at the mercy of CA_CERT_PEM being the latest
     # and ALSO in its index.txt file as well.
     ${DRY_RUN} ${OPENSSL_X509} -x509toreq \
+        ${CIPHER_ARG_PASSIN} \
        -in "$IA_CERT_PEM" \
        -signkey "$IA_KEY_PEM" \
        -out "$IA_CSR_PEM"
@@ -1404,7 +1411,7 @@ function ca_extract_signing_request
     fi
     if [[ ${VERBOSITY} -ne 0 ]]; then
         openssl asn1parse -in "$IA_CSR_PEM"
-        openssl req -noout -text -in "$IA_CSR_PEM"
+        openssl req ${CIPHER_ARG_PASSIN} -in "$IA_CSR_PEM" -noout -text
     fi
 }
 
@@ -1422,6 +1429,7 @@ function ca_renew_certificate
         -extfile "${IA_OPENSSL_CNF_EXTFILE}" \
         -extensions "$IA_OPENSSL_CNF_EXTENSION" \
         -days 1095 \
+        ${CIPHER_ARG_PASSIN} \
         -in "$IA_CSR_PEM" \
         -out "$IA_CERT_PEM"
     RETSTS=$?
@@ -1491,7 +1499,7 @@ function display_ca_certificate {
 
     if [[ "$VERBOSITY" -ne 0 ]]; then
         echo "Decoding $PARENT_TYPE_STR certificate:"
-        ${DRY_RUN} ${OPENSSL_X509} -in "$THIS_PEM" -noout -text
+        ${DRY_RUN} ${OPENSSL_X509} ${CIPHER_ARG_PASSIN} -in "$THIS_PEM" -noout -text
     else
         echo "To see decoded $PARENT_TYPE_STR certificate, execute:"
         echo "  $OPENSSL_X509 -in $THIS_PEM -noout -text"
@@ -1588,11 +1596,9 @@ function cmd_create_ca {
 
     ca_create_revocation_list
 
-    if [[ "$NO_PARENT" -ne 1 ]]; then
-        # Save Parent CA
-        REL_PARENT_IA_PATH=$(realpath --relative-to="$SSL_DIR" "$PARENT_IA_DIR")
-        echo "$REL_PARENT_IA_PATH" > "$IA_DIR/PARENT_CA"
-    fi
+    # Save Parent CA
+    REL_PARENT_IA_PATH=$(realpath --relative-to="$SSL_DIR" "$PARENT_IA_DIR")
+    echo "$REL_PARENT_IA_PATH" > "$IA_DIR/PARENT_CA"
 
     # Clean up
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_INDEX_DB"
@@ -1770,7 +1776,7 @@ function cmd_verify_ca {
     echo "Certificate: $IA_CERT_PEM"
 
     # Verify the key
-    openssl pkey -noout -in "$IA_KEY_PEM" -check
+    openssl pkey -noout ${CIPHER_ARG_PASSIN} -in "$IA_KEY_PEM" -check
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
         echo "Key $IA_KEY_PEM: FAILED VERIFICATION"
@@ -2182,6 +2188,17 @@ case "$CIPHER" in
   aes128|aes256|"aes-256-cbc"|aes-128-cbc|des-ede3-cbc|camellia-256-cbc)
     # Never use '-pass stdin' for password inputs because it 'echos' keystrokes
     CIPHER_OPTION="-$CIPHER"
+    if [ -n "${DEFAULT_CIPHER_FILE}" ]; then
+
+        if [ -f "${DEFAULT_CIPHER_FILE}" ]; then
+            echo "Reading cipher password from [${DEFAULT_CIPHER_FILE}]..."
+            CIPHER_ARG_PASS="-pass file:${DEFAULT_CIPHER_FILE}"
+            CIPHER_ARG_PASSIN="-passin file:${DEFAULT_CIPHER_FILE}"
+            CIPHER_ARG_PASSOUT="-passout file:${DEFAULT_CIPHER_FILE}"
+        else
+            echo "Using default cipher source due to [${DEFAULT_CIPHER_FILE}] file not being found..."
+        fi
+    fi
     ;;
   "")
     CIPHER_OPTION=
