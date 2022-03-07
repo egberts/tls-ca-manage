@@ -11,7 +11,7 @@ TLS_CERT_MANAGE="../tls-cert-manage.sh"
 ${TLS_CA_MANAGE} create -t root AcmeRoot
 
 #  Create intermediates CA
-${TLS_CA_MANAGE} create -p root -t intermediate AcmeNetwork
+${TLS_CA_MANAGE} create -p AcmeRoot -t intermediate AcmeNetwork
 
 #  Create signing CAs
 ${TLS_CA_MANAGE} create -p AcmeNetwork -t intermediate AcmeComponent
