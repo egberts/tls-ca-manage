@@ -276,6 +276,8 @@ DEFAULT_USER_NAME=${USER}  # tells most IDE syntax checker to say that $USER is 
 # DEFAULT_SIGNING_CA_NAME="component"
 DEFAULT_NODE_TYPE="standalone"
 
+DEFAULT_CA_EXTEND_DAYS="${DEFAULT_CA_EXTEND_DAYS:-1095}"
+
 DEFAULT_FILETYPE_KEY="key"   # sometimes .private
 DEFAULT_FILETYPE_CSR="csr"   # sometimes .req, .request (PKCS#10)
 DEFAULT_FILETYPE_CERT="crt"  # sometimes .pem, .cert, .cer  (PKCS#7)
@@ -1428,7 +1430,7 @@ function ca_renew_certificate
         ${IA_OPENSSL_CA_OPT} \
         -extfile "${IA_OPENSSL_CNF_EXTFILE}" \
         -extensions "$IA_OPENSSL_CNF_EXTENSION" \
-        -days 1095 \
+        -days ${DEFAULT_CA_EXTEND_DAYS} \
         ${CIPHER_ARG_PASSIN} \
         -in "$IA_CSR_PEM" \
         -out "$IA_CERT_PEM"
