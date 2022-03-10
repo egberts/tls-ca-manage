@@ -630,6 +630,7 @@ function directory_file_layout {
 }
 
 function change_owner_perm {
+    local CHOP_USER CHOP_GROUP CHOP_PERM CHOP_FILESPEC
     CHOP_USER="$1"
     CHOP_GROUP="$2"
     CHOP_PERM="$3"
@@ -648,10 +649,6 @@ function change_owner_perm {
       echo "Error $RETSTS setting $CHOP_USER:$CHOP_GROUP owner to $CHOP_FILESPEC; aborting..."
       exit ${RETSTS}
     fi
-    unset CHOP_USER
-    unset CHOP_GROUP
-    unset CHOP_PERM
-    unset CHOP_FILESPEC
 }
 
 function create_ca_directory {
@@ -669,6 +666,7 @@ function create_ca_directory {
 }
 
 function touch_ca_file {
+    local TOUCH_THIS_FILE
     TOUCH_THIS_FILE="$1"
     if [[ -d ${TOUCH_THIS_FILE} ]]; then
         # it does wonder to the file system by touching a directory (EXT4 corruption)
@@ -679,25 +677,24 @@ function touch_ca_file {
     [[ ${VERBOSITY} -gt 0 ]] && echo "touch $TOUCH_THIS_FILE"
     touch "$1"
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$TOUCH_THIS_FILE"
-    unset TOUCH_THIS_FILE
 }
 
 function delete_dir {
+    local DELETE_DIR
     DELETE_DIR="${1:-/tmp/nope}"  # emergency undefined $1 protection
     if [[ -d "$DELETE_DIR" ]]; then
         [[ ${VERBOSITY} -gt 0 ]] && echo "rm -rf $DELETE_DIR"
         rm -rf "$DELETE_DIR"
     fi
-    unset DELETE_DIR
 }
 
 function delete_file {
+    local DELETE_FILE
     DELETE_FILE="${1:-/tmp/nope}"  # emergency undefined $1 protection
     if [[ -f "$DELETE_FILE" ]]; then
         [[ ${VERBOSITY} -gt 0 ]] && echo "rm $DELETE_FILE"
         rm "$DELETE_FILE"
     fi
-    unset DELETE_FILE
 }
 
 function delete_ca_config {
@@ -822,6 +819,7 @@ function data_entry_generic {
 
 # Usage: get_x509v3_extension_by_ca_type <ca_type> <pathlen>
 function get_x509v3_extension_by_ca_type {
+  local GXEBCT_CA_TYPE GXEBCT_PATHLEN_COUNT
   GXEBCT_CA_TYPE=$1
   GXEBCT_PATHLEN_COUNT=$2
   [[ -n ${GXEBCT_PATHLEN_COUNT} ]] || GXEBCT_PATHLEN_COUNT=-1
@@ -1038,20 +1036,17 @@ function get_x509v3_extension_by_ca_type {
       echo "Invalid '$GXEBCT_CA_TYPE' option"
       ;;
   esac
-  unset GXEBCT_CA_TYPE
-  unset GXEBCT_PATHLEN_COUNT
 }
 
 function write_line_or_no
 {
+    local WLON_KEY_NAME WLON_VALUE_NAME WLON_FILESPEC
     WLON_KEY_NAME=$1
     WLON_VALUE_NAME=$2
     WLON_FILESPEC=$3
     if [[ -n "$WLON_VALUE_NAME" ]]; then
         echo "$WLON_KEY_NAME = $WLON_VALUE_NAME" >> "$WLON_FILESPEC"
     fi
-    unset WLON_KEY_NAME
-    unset WLON_VALUE_NAME
 }
 
 # Creates an extension file that details the
@@ -1192,6 +1187,9 @@ ECDSA.Certificate = server-ecdsa.pem
 
 function create_generic_ca_extension_config_file
 {
+
+    local CIC_SECTION_NAME CIC_INTERNODE_CONFIG_FILESPEC CIC_PARENT_CONFIG_FILESPEC
+    local CIC_TIMESTAMP
     CIC_SECTION_NAME=$1
     CIC_INTERNODE_CONFIG_FILESPEC=$2
     CIC_PARENT_CONFIG_FILESPEC=$3
@@ -1254,11 +1252,6 @@ URI.0                   = \$crl_url
 """ >> "$CIC_INTERNODE_CONFIG_FILESPEC"
 
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CIC_INTERNODE_CONFIG_FILESPEC"
-
-    unset CIC_SECTION_NAME
-    unset CIC_INTERNODE_CONFIG_FILESPEC
-    unset CIC_PARENT_CONFIG_FILESPEC
-    unset CIC_TIMESTAMP
 }
 
 
@@ -1302,6 +1295,19 @@ function ca_create_public_key
     fi
 }
 
+
+function ca_create_chain_certificate
+{
+    # chains are made only in non-root depth mode
+    if [[ "$DEPTH_MODE" != "root" ]]; then
+        echo "Creating $PARENT_TYPE_STR chain certificate ..."
+        echo "cat ${IA_CERT_PEM} ${PARENT_IA_CERT_PEM} > ${IA_CHAIN_PEM}"
+        cat "${IA_CERT_PEM}" "${PARENT_IA_CERT_PEM}" > "${IA_CHAIN_PEM}"
+        change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_CHAIN_PEM"
+    fi
+}
+
+
 #########################################################
 # Create the CA node's signing request certificate      #
 #########################################################
@@ -1337,6 +1343,8 @@ function ca_create_csr
 # Parent CA accept CA node's CSR by trusting  #
 ###############################################
 function ca_create_certificate {
+    local IA_OPENSSL_CNF_EXTFILE IA_OPENSSL_CNF_EXTENSION
+
     echo "Creating $IA_NAME ($NODE_TYPE) certificate ..."
     IA_OPENSSL_CNF_EXTFILE="$1"
     IA_OPENSSL_CNF_EXTENSION="$2"
@@ -1364,15 +1372,7 @@ function ca_create_certificate {
         change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_CERT_PEM"
     fi
 
-    # bundle chains are made only in non-root depth mode
-    if [[ "$DEPTH_MODE" != "root" ]]; then
-        echo "Creating $PARENT_TYPE_STR chain certificate ..."
-        echo "cat ${IA_CERT_PEM} ${PARENT_IA_CERT_PEM} > ${IA_CHAIN_PEM}"
-        cat "${IA_CERT_PEM}" "${PARENT_IA_CERT_PEM}" > "${IA_CHAIN_PEM}"
-        change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_CHAIN_PEM"
-    fi
-    unset IA_OPENSSL_CNF_EXTFILE
-    unset IA_OPENSSL_CNF_EXTENSION
+    ca_create_chain_certificate
 }
 
 function ca_create_revocation_list
@@ -1422,6 +1422,7 @@ function ca_extract_signing_request
 ###########################################################
 function ca_renew_certificate
 {
+    local IA_OPENSSL_CNF_EXTFILE IA_OPENSSL_CNF_EXTENSION
     IA_OPENSSL_CNF_EXTFILE="$1"
     IA_OPENSSL_CNF_EXTENSION="$2"
     # DO NOT USE 'openssl x509', because lack of DB accounting
@@ -1442,17 +1443,6 @@ function ca_renew_certificate
     if [[ ! -f "$IA_CERT_PEM" ]]; then
         echo "Failed to recreate $PARENT_TYPE_STR certificate ($IA_CERT_PEM}"
         exit 2 # ENOENT
-    fi
-    unset IA_OPENSSL_CNF_EXTFILE
-    unset IA_OPENSSL_CNF_EXTENSION
-}
-
-function ca_create_chain_certificate
-{
-    # chains are made only in non-root depth mode
-    if [[ "$DEPTH_MODE" != "root" ]]; then
-        echo "Creating $PARENT_TYPE_STR chain certificate ..."
-        cat "${IA_CERT_PEM}" "${PARENT_IA_CERT_PEM}" > "${IA_CHAIN_PEM}"
     fi
 }
 
@@ -2333,8 +2323,8 @@ fi
 # It's stupid that we have to export this OpenSSL configuration filespec
 # If we didn't, it would 'furtively' refer to it's built-in /usr/lib/openssl/openssl.cnf if no '-config' were used as 'strace -f' has shown.
 export OPENSSL_CONF="$IA_OPENSSL_CNF"
-unset OPENSSL_FIPS
-unset OPENSSL_DEBUG_MEMORY
+unset OPENSSL_FIPS  # prophalytic
+unset OPENSSL_DEBUG_MEMORY  # prophalytic
 export OPENSSL_TRACE="TRACE,X509V3_POLICY"
 export SSL_CERT_FILE="/dev/null"
 
