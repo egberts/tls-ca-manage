@@ -1787,7 +1787,7 @@ function cmd_verify_ca {
     fi
 
     # Verify the Certificate
-    openssl verify -no-CApath -no-CAstore \
+    openssl verify -no-CApath \
         -CAfile "$PARENT_IA_CERT_PEM" "$IA_CERT_PEM"
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then

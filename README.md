@@ -23,7 +23,6 @@ Certificate Authority Management tool is witten in bash shell.  Runs on any plat
 
 If you have ANY of the following:
 
-* at least version 1.1.1b of OpenSSL
 * befuddle by myriad of OpenSSL CLI options, particularly encryption
 * perplex by how to cross-set the numerous settings between sections within and between the OpenSSL configuration files.
 * a white lab or clean room
