@@ -259,6 +259,7 @@ Default settings:
 # Default values (tweakable)
 # DEFAULT_CIPHER="des-ede3-cbc"
 DEFAULT_CIPHER=
+DEFAULT_CIPHER_FILE="${DEFAULT_CIPHER_FILE:-/tmp/openssl-pass.tmp}"
 DEFAULT_CMD_MODE="verify"
 DEFAULT_GROUP_NAME="ssl-cert"
 DEFAULT_KEYSIZE_BITS=4096
@@ -274,6 +275,8 @@ DEFAULT_USER_NAME=${USER}  # tells most IDE syntax checker to say that $USER is 
 # DEFAULT_INT_CA_NAME="network"
 # DEFAULT_SIGNING_CA_NAME="component"
 DEFAULT_NODE_TYPE="standalone"
+
+DEFAULT_CA_EXTEND_DAYS="${DEFAULT_CA_EXTEND_DAYS:-1095}"
 
 DEFAULT_FILETYPE_KEY="key"   # sometimes .private
 DEFAULT_FILETYPE_CSR="csr"   # sometimes .req, .request (PKCS#10)
@@ -1270,9 +1273,9 @@ function ca_create_public_key
 
     ${DRY_RUN} ${OPENSSL_GENPKEY} \
         ${OPENSSL_ALGORITHM} \
-        ${CIPHER_OPTION} \
         -text \
         -outform PEM \
+        ${CIPHER_ARG_PASS} \
         -out "${IA_KEY_PEM}"
 
     RETSTS=$?
@@ -1292,6 +1295,7 @@ function ca_create_public_key
         # View the private key in readable format
         openssl asn1parse -in "$IA_KEY_PEM"
         openssl pkey \
+            ${CIPHER_ARG_PASSIN} \
             -in "$IA_KEY_PEM" \
             -noout \
             -text
@@ -1304,6 +1308,7 @@ function ca_create_public_key
 function ca_create_csr
 {
     ${DRY_RUN} ${OPENSSL_REQ} -new \
+        ${CIPHER_ARG_PASSIN} \
         -key "$IA_KEY_PEM" \
         "-$MESSAGE_DIGEST" \
         -out "$IA_CSR_PEM"
@@ -1324,7 +1329,7 @@ function ca_create_csr
     if [[ ${VERBOSITY} -ne 0 ]]; then
         # View the CSR in readable format
         openssl asn1parse -in "$IA_CSR_PEM"
-        openssl req -in "$IA_CSR_PEM" -noout -text
+        openssl req ${CIPHER_ARG_PASSIN} -in "$IA_CSR_PEM" -noout -text
     fi
 }
 
@@ -1340,6 +1345,7 @@ function ca_create_certificate {
         ${IA_OPENSSL_CA_OPT} \
         -extfile "${IA_OPENSSL_CNF_EXTFILE}" \
         -extensions "${IA_OPENSSL_CNF_EXTENSION}" \
+        ${CIPHER_ARG_PASSIN} \
         -in "$IA_CSR_PEM" \
         -days 3650 \
         -md "$MESSAGE_DIGEST" \
@@ -1375,6 +1381,7 @@ function ca_create_revocation_list
     ${DRY_RUN} ${OPENSSL_CA} \
         -gencrl \
         -config "$IA_OPENSSL_CNF" \
+        ${CIPHER_ARG_PASSIN} \
         -out "$IA_CRL_PEM"
     RETSTS=$?
     if [[ $RETSTS -ne 0 ]]; then
@@ -1391,6 +1398,7 @@ function ca_extract_signing_request
     # We are at the mercy of CA_CERT_PEM being the latest
     # and ALSO in its index.txt file as well.
     ${DRY_RUN} ${OPENSSL_X509} -x509toreq \
+        ${CIPHER_ARG_PASSIN} \
        -in "$IA_CERT_PEM" \
        -signkey "$IA_KEY_PEM" \
        -out "$IA_CSR_PEM"
@@ -1405,7 +1413,7 @@ function ca_extract_signing_request
     fi
     if [[ ${VERBOSITY} -ne 0 ]]; then
         openssl asn1parse -in "$IA_CSR_PEM"
-        openssl req -noout -text -in "$IA_CSR_PEM"
+        openssl req ${CIPHER_ARG_PASSIN} -in "$IA_CSR_PEM" -noout -text
     fi
 }
 
@@ -1422,7 +1430,8 @@ function ca_renew_certificate
         ${IA_OPENSSL_CA_OPT} \
         -extfile "${IA_OPENSSL_CNF_EXTFILE}" \
         -extensions "$IA_OPENSSL_CNF_EXTENSION" \
-        -days 1095 \
+        -days ${DEFAULT_CA_EXTEND_DAYS} \
+        ${CIPHER_ARG_PASSIN} \
         -in "$IA_CSR_PEM" \
         -out "$IA_CERT_PEM"
     RETSTS=$?
@@ -1488,11 +1497,11 @@ function ca_serialization_and_unique_filenames
 function display_ca_certificate {
     THIS_PEM="$1"
     echo "Displaying MD5 of various CA certificates:"
-    echo "$(${OPENSSL_X509} -noout -modulus -in "$THIS_PEM" | ${OPENSSL_MD5}) $THIS_PEM"
+    echo "$(${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$THIS_PEM" | ${OPENSSL_MD5}) $THIS_PEM"
 
     if [[ "$VERBOSITY" -ne 0 ]]; then
         echo "Decoding $PARENT_TYPE_STR certificate:"
-        ${DRY_RUN} ${OPENSSL_X509} -in "$THIS_PEM" -noout -text
+        ${DRY_RUN} ${OPENSSL_X509} ${CIPHER_ARG_PASSIN} -in "$THIS_PEM" -noout -text
     else
         echo "To see decoded $PARENT_TYPE_STR certificate, execute:"
         echo "  $OPENSSL_X509 -in $THIS_PEM -noout -text"
@@ -1720,6 +1729,7 @@ function cmd_revoke_ca {
     # -keyfile and -cert are not needed if an openssl.cnf is proper
 
     ${DRY_RUN} ${OPENSSL_X509} -noout -text \
+        ${CIPHER_ARG_PASSIN} \
         -in "$REVOKING_CERT_FILE"
 
     echo -n "Revoke above certificate? (y/N): "
@@ -1769,7 +1779,7 @@ function cmd_verify_ca {
     echo "Certificate: $IA_CERT_PEM"
 
     # Verify the key
-    openssl pkey -noout -in "$IA_KEY_PEM" -check
+    openssl pkey -noout ${CIPHER_ARG_PASSIN} -in "$IA_KEY_PEM" -check
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
         echo "Key $IA_KEY_PEM: FAILED VERIFICATION"
@@ -1804,9 +1814,9 @@ function cmd_verify_ca {
     ########################################
 
     # Checking MD5 hash
-    hashkey=$(${OPENSSL_X509} -noout -in "$IA_CERT_PEM" | \
+    hashkey=$(${OPENSSL_X509} -noout ${CIPHER_ARG_PASSIN} -in "$IA_CERT_PEM" | \
               ${OPENSSL_MD5} )
-    hashcrt=$(${OPENSSL_PKEY} -noout -in "$IA_KEY_PEM" | \
+    hashcrt=$(${OPENSSL_PKEY} -noout ${CIPHER_ARG_PASSIN} -in "$IA_KEY_PEM" | \
               ${OPENSSL_MD5} )
     if [[ "${hashkey}" = "${hashcrt}" ]]; then
         echo "MD5 hash matches"
@@ -1817,11 +1827,13 @@ function cmd_verify_ca {
 
     # Checking SPKIsha256 hash
     hashkey=$(openssl pkey \
+        ${CIPHER_ARG_PASSIN} \
         -in "$IA_KEY_PEM" \
         -pubout \
         -outform der \
         | sha256sum)
     hashcrt=$(openssl x509 \
+        ${CIPHER_ARG_PASSIN} \
         -in "$IA_CERT_PEM" \
         -pubkey \
         | openssl pkey \
@@ -1849,10 +1861,12 @@ function cmd_verify_ca {
         dd if=/dev/urandom of="${TMP}/rnd" bs=32 count=1 status=none
         openssl pkeyutl -sign \
             -inkey "$IA_KEY_PEM" \
+            ${CIPHER_ARG_PASSIN} \
             -in "${TMP}/rnd" \
             -out "${TMP}/sig"
         openssl pkeyutl -verifyrecover \
             -inkey "${TMP}/pubkey.pem" \
+            ${CIPHER_ARG_PASSIN} \
             -in "${TMP}/sig" \
             -out "${TMP}/check"
         if cmp -s "${TMP}/check" "${TMP}/rnd"; then
@@ -1865,11 +1879,11 @@ function cmd_verify_ca {
         rm -rf "${TMP}"
 
         # Extract serial ID from CRT PEM file
-        SERIAL_ID=$(openssl x509 -noout -serial -in $IA_CERT_PEM | awk -F= '{print $2}')
+        SERIAL_ID=$(openssl x509 -noout -serial ${CIPHER_ARG_PASSIN} -in $IA_CERT_PEM | awk -F= '{print $2}')
         CA_NEWCERT_CURRENT_PEM="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${SERIAL_ID}.pem"
 
-        next_pem="$(${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_CURRENT_PEM" | ${OPENSSL_MD5})"
-        current_pem="$(${OPENSSL_X509} -noout -modulus -in "$IA_CERT_PEM" | ${OPENSSL_MD5})"
+        next_pem="$(${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$CA_NEWCERT_CURRENT_PEM" | ${OPENSSL_MD5})"
+        current_pem="$(${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$IA_CERT_PEM" | ${OPENSSL_MD5})"
 
         if [[ "$next_pem" == "$current_pem" ]]; then
             echo "Archive matches"
@@ -1957,7 +1971,7 @@ while true; do
         shift;
         MESSAGE_DIGEST=$1
         ;;
-    -n|-nested-ca)
+    -n|--nested-ca)
         OFSTD_DIR_TREE_TYPE="hierarchy"
         ;;
     -o|--openssl)
@@ -2181,6 +2195,17 @@ case "$CIPHER" in
   aes128|aes256|"aes-256-cbc"|aes-128-cbc|des-ede3-cbc|camellia-256-cbc)
     # Never use '-pass stdin' for password inputs because it 'echos' keystrokes
     CIPHER_OPTION="-$CIPHER"
+    if [ -n "${DEFAULT_CIPHER_FILE}" ]; then
+
+        if [ -f "${DEFAULT_CIPHER_FILE}" ]; then
+            echo "Reading cipher password from [${DEFAULT_CIPHER_FILE}]..."
+            CIPHER_ARG_PASS="-pass file:${DEFAULT_CIPHER_FILE}"
+            CIPHER_ARG_PASSIN="-passin file:${DEFAULT_CIPHER_FILE}"
+            CIPHER_ARG_PASSOUT="-passout file:${DEFAULT_CIPHER_FILE}"
+        else
+            echo "Using default cipher source due to [${DEFAULT_CIPHER_FILE}] file not being found..."
+        fi
+    fi
     ;;
   "")
     CIPHER_OPTION=

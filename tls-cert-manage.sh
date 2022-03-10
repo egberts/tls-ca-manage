@@ -558,6 +558,11 @@ function change_owner_perm {
       echo "Error $RETSTS setting $CHOP_USER:$CHOP_GROUP owner to $CHOP_FILESPEC; aborting..."
       exit ${RETSTS}
     fi
+
+    unset CHOP_USER
+    unset CHOP_GROUP
+    unset CHOP_PERM
+    unset CHOP_FILESPEC
 }
 
 
