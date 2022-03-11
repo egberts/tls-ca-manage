@@ -8,7 +8,7 @@
 #
 # SYNOPSIS
 #     tls-cert-manage.sh create <CERT-NAME> <CERT-TYPE> <CA-NAME>
-#     tls-cert-manage.sh verify <CERT-NAME>
+#     tls-cert-manage.sh verify <CERT-NAME> <CERT-TYPE>
 #     tls-cert-manage.sh renew <CERT-NAME> <CA-NAME>
 #     tls-cert-manage.sh revoke <CERT-NAME> <CA-NAME> [REASON]
 #
@@ -34,7 +34,7 @@
 #          timestamping - ANSI X9.95 TimeStamping (RFC3161)
 #          proxy        - Used for proxying
 #
-#        This argument is used only with 'create' command line option
+#        This argument is used only with 'create' AND 'verify' command line options
 #
 #    CA-NAME
 #        Specifies the simple name of CA in which to sign this
@@ -117,6 +117,9 @@
 #    -v, --verbose
 #        Sets the debugging level.
 #
+# Files Created:
+#   $SSL_CA_CERTS_DIR/PARENT_ID
+#
 # NOTES:
 #
 #    Enforces 'ssl-cert' group; and requires all admins to have 'ssl-cert'
@@ -132,7 +135,6 @@
 #
 #     Inspired by: https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
 #
-ADD_SAN_DATA_ENTRY=0
 X509_PREFIX=""
 X509_SUFFIX=""
 CNF_CA_EXT_EXTRA=""
@@ -144,7 +146,7 @@ function cmd_show_syntax_usage {
   $0 create [options] <cert-name> <cert-type> <ca-name>
   $0 renew [options] <cert-name> <ca-name>
   $0 revoke [options] <cert-name> <ca-name> <reason>
-  $0 verify [options] <cert-name>
+  $0 verify [options] <cert-name> <cert-type>
   $0 help
 
   cert-name: A simple filename for this certificate
@@ -396,7 +398,7 @@ function directory_file_layout {
 
         CERT_EXT_DIR="$DFL_SSL_DIR/etc"
         CERT_CRL_DIR="$CERT_CERTS_DIR"
-        CERT_CERTS_DIR="$CERT_CERTS_DIR"
+        # CERT_CERTS_DIR="$CERT_CERTS_DIR"
         CERT_CSR_DIR="$CERT_CERTS_DIR"
 
         PARENT_IA_EXT_DIR="$CERT_EXT_DIR"
@@ -405,7 +407,7 @@ function directory_file_layout {
         PARENT_IA_DB_DIR="$PARENT_IA_DIR/$CERT_DB_DNAME"
 
         CERT_NEWCERTS_ARCHIVE_DIR="$PARENT_IA_DIR"  # where those 000x.pem files go
-        CERT_KEY_DIR="$SSL_DIR/$CERTS_DNAME"
+        CERT_KEY_DIR="$SSL_DIR/$PRIVATE_DNAME"
 
         PARENT_IA_NEWCERTS_ARCHIVE_DIR="$PARENT_IA_DIR"  # where those 000x.pem files go
         PARENT_IA_INDEX_DB_DIR="$PARENT_IA_DIR/$CERT_DB_DNAME"
@@ -605,247 +607,6 @@ function delete_cert_dirfiles {
     fi
 }
 
-function data_entry_generic {
-    ID_INPUT_DATA=""
-    input_data "Organization" "$X509_ORG"
-    X509_ORG="$ID_INPUT_DATA"
-    input_data "Org. Unit/Section/Division: " "$X509_OU"
-    X509_OU="$ID_INPUT_DATA"
-
-    if [ "$NODE_TYPE" == "server" ]; then
-      echo ""
-      echo "Enter in the domain name into Common Name (NO WILDCARD)"
-      input_data "Common Name: " "$X509_COMMON"
-    else
-      input_data "Common Name: " "$X509_COMMON"
-    fi
-    X509_COMMON="$ID_INPUT_DATA"
-    input_data "Country (2-char max.): " "$X509_COUNTRY"
-    X509_COUNTRY="$ID_INPUT_DATA"
-    input_data "State: " "$X509_STATE"
-    X509_STATE="$ID_INPUT_DATA"
-    input_data "Locality/City: " "$X509_LOCALITY"
-    X509_LOCALITY="$ID_INPUT_DATA"
-    input_data "Contact email: " "$X509_EMAIL"
-    X509_EMAIL="$ID_INPUT_DATA"
-
-    input_data "Base URL: " "$X509_URL_BASE"
-    X509_URL_BASE="$ID_INPUT_DATA"
-
-    X509_URL_OCSP="${X509_URL_BASE}:9080/ocsp"
-    input_data "OCSP URL: " "$X509_URL_OCSP"
-    X509_URL_OCSP="$ID_INPUT_DATA"
-
-    X509_CRL="${X509_URL_BASE}/${CERT_CRL_FNAME}"
-    input_data "CRL URL: " "$X509_CRL"
-    X509_CRL="$ID_INPUT_DATA"
-
-    if [ "$NODE_TYPE" == "server" ]; then
-      CNF_CA_EXT_EXTRA_A+=("[alt_names]")
-      echo ""
-      echo "This is a SERVER type certificate"
-      echo "   First we will put in all variants of domain names in,"
-      echo "   Then we will put in all variants of IP address in."
-      echo "   Hit ENTER to quit."
-      echo "NOTE: Domain wildcard allowed here"
-      idx=1
-      while true; do
-        read -rp "Enter in domain name: "
-        if [ -z "$REPLY" ]; then
-          break;
-        fi
-        REPLY="$(echo "$REPLY" | awk '{ print tolower($1) }')"
-        CNF_CA_EXT_EXTRA_A+=("DNS.$idx = $REPLY")
-        ((idx++))
-      done
-      echo ""
-      echo "   Hit ENTER to quit."
-      echo "NOTE: No slash, CIDR nor subnet allowed; just plain IP address format"
-      idx=1
-      while true; do
-        read -rp "Enter in IP address: "
-        if [ -z "$REPLY" ]; then
-          break;
-        fi
-        REPLY="$(echo "$REPLY" | awk '{ print tolower($1) }')"
-        CNF_CA_EXT_EXTRA_A+=("IP.$idx = $REPLY")
-        ((idx++))
-      done
-      echo "CNF_CA_EXT_EXTRA_A[]: ${CNF_CA_EXT_EXTRA_A[*]}"
-    fi
-}
-
-
-
-# Usage: get_x509v3_extension_by_cert_type <ca_type>
-function get_x509v3_extension_by_cert_type {
-  ADD_SAN_DATA_ENTRY=0
-  GXEBCT_CA_TYPE=$1
-  case "$GXEBCT_CA_TYPE" in
-    server)
-      # shellcheck disable=SC2034
-      ADD_SAN_DATA_ENTRY=1
-      CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"
-      CNF_REQ_EXT_BC="CA:false"
-      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
-      # CNF_REQ_EXT_AKI="keyid,issuer:always"  # used in 802.1ar iDevID
-      # CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier (openssl ca)
-      # Need to remove 'clientAuth' from server extendedKeyUsage; no citation
-      # Need to remove 'nsSGC' from extendedKeyUsage, but no citation
-      # Need to remove 'msSGC' from extendedKeyUsage, but no citation
-      CNF_REQ_EXT_EKU="serverAuth,clientAuth"
-      # CNF_REQ_EXT_SAN="\$ENV::SAN"  # subjectAltName
-      CNF_REQ_EXT_SAN="@alt_names"  # subjectAltName
-      # CNF_REQ_EXT_AIA="@ocsp_info"
-      # CNF_REQ_EXT_AIA="@issuer_info"
-      CNF_REQ_EXT_AIA=""
-      CNF_REQ_EXT_CRL=""
-      # CNF_REQ_EXT_EXTRA=""
-      # signing-ca.cnf/[server_ext]
-      # email-ca.cnf/[server_ext]
-      CNF_CA_EXT_KU="critical,digitalSignature"
-      CNF_CA_EXT_BC="CA:false"
-      CNF_CA_EXT_SKI="hash"
-      CNF_CA_EXT_AKI="keyid,issuer:always"
-      CNF_CA_EXT_AIA=""  # no need for OCSP nor Issuer info here
-      CNF_CA_EXT_EKU="serverAuth"
-      # Only need serverAuth & clientAuth together if
-      #   making a PEM key that combines private and public key (bad idea)
-      # CNF_CA_EXT_SAN="\$ENV::SAN"  # subjectAltName
-      CNF_CA_EXT_AIA="@ocsp_info"
-      CNF_CA_EXT_CRL="URI:${X509_CRL}"
-      CNF_CA_EXT_EXTRA=""
-
-      ###
-      ;;
-    client)
-      CNF_REQ_EXT_KU="critical,digitalSignature"
-      CNF_REQ_EXT_BC="CA:false"
-      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      CNF_REQ_EXT_EKU="clientAuth"
-      CNF_REQ_EXT_SAN="email:move"  # subjectAltName
-      CNF_REQ_EXT_AIA="@issuer_info"
-      CNF_REQ_EXT_CRL=""
-      # CNF_REQ_EXT_EXTRA=""
-      # email-ca.cnf/[client_ext]
-      CNF_CA_EXT_KU="critical,digitalSignature"
-      CNF_CA_EXT_BC="CA:false"
-      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      CNF_CA_EXT_EKU="clientAuth"
-      CNF_CA_EXT_SAN="email:move"  # subjectAltName
-      CNF_CA_EXT_AIA="@ocsp_info"
-      CNF_CA_EXT_CRL="URI:${X509_CRL}"
-      CNF_CA_EXT_EXTRA=""
-      ;;
-    timestamping)
-      CNF_REQ_EXT_KU="critical,digitalSignature"
-      CNF_REQ_EXT_BC="CA:false"
-      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      CNF_REQ_EXT_EKU="critical,timeStamping"
-      CNF_REQ_EXT_SAN=""  # subjectAltName
-      CNF_REQ_EXT_AIA="@issuer_info"
-      CNF_REQ_EXT_CRL=""
-      # CNF_REQ_EXT_EXTRA=""
-      ;;
-    ocsp)
-      CNF_REQ_EXT_KU="critical,digitalSignature"
-      CNF_REQ_EXT_BC="CA:false"
-      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      CNF_REQ_EXT_EKU="critical,OCSPSigning"
-      CNF_REQ_EXT_SAN=""  # subjectAltName
-      CNF_REQ_EXT_AIA="@issuer_info"
-      CNF_REQ_EXT_CRL=""
-      # CNF_REQ_EXT_EXTRA=""
-      CNF_CA_EXT_KU="critical,digitalSignature"
-      CNF_CA_EXT_BC="CA:false"
-      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_CA_EXT_AKI="keyid,issuer"  # authorityKeyIdentifier
-      CNF_CA_EXT_EKU="critical,OCSPSigning"
-      CNF_CA_EXT_SAN=""  # subjectAltName
-      CNF_CA_EXT_AIA=""
-      CNF_CA_EXT_CRL=""
-      CNF_CA_EXT_EXTRA="noCheck = null"
-      ;;
-    email)
-      CNF_REQ_EXT_KU="critical,keyEncipherment"
-      CNF_REQ_EXT_BC="CA:false"  # basicConstraint
-      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_REQ_EXT_AKI=""  # authorityKeyIdentifier
-      CNF_REQ_EXT_EKU="emailProtection,clientAuth"
-      CNF_REQ_EXT_SAN="email:move"  # subjectAltName
-      CNF_REQ_EXT_AIA="@issuer_info"
-      CNF_REQ_EXT_CRL=""
-      # CNF_REQ_EXT_EXTRA=""
-      # signing-ca.cnf/[email_ext]
-      # email-ca.cnf/[email_ext]
-      CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
-      CNF_CA_EXT_BC="CA:false"  # basicConstraint
-      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      CNF_CA_EXT_EKU="emailProtection,clientAuth,anyExtendedKeyUsage"
-      CNF_CA_EXT_SAN=""  # subjectAltName
-      CNF_CA_EXT_AIA="@issuer_info"
-      CNF_CA_EXT_CRL=""
-      # CNF_CA_EXT_EXTRA=""
-    ;;
-    # encryption supports 802.1ar, Microsoft Encrypted File System
-    encryption)
-      CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"  # keyUsage
-      CNF_REQ_EXT_BC=""  # basicConstraint
-      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_REQ_EXT_AKI=""  # authorityKeyIdentifier
-      # email encryption = "emailProtection,clientAuth"
-      # Microsoft Encrypted File System = "emailProtection,msEFS"
-      # merged plain email and MS identity encryption together
-      CNF_REQ_EXT_EKU="emailProtection,clientAuth,msEFS"
-      CNF_REQ_EXT_SAN="email:move"  # subjectAltName
-      CNF_REQ_EXT_AIA="@issuer_info"
-      CNF_REQ_EXT_CRL=""
-      # CNF_REQ_EXT_EXTRA=""
-      ;;
-    identity)  # there's identity-ca and identity, this here is identity-ca
-      CNF_REQ_EXT_KU="critical,digitalSignature"
-      CNF_REQ_EXT_BC="CA:false"  # basicConstraint
-      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      # msSmartcardLogin is implementation-dependent, but include here nonetheless
-      CNF_REQ_EXT_EKU="emailProtection,clientAuth,msSmartcardLogin"
-      CNF_REQ_EXT_SAN="email:move"  # subjectAltName
-      CNF_REQ_EXT_AIA="@issuer_info"
-      CNF_REQ_EXT_CRL=""
-      # CNF_REQ_EXT_EXTRA=""
-      ;;
-    codesign)
-      CNF_REQ_EXT_KU="critical,digitalSignature"
-      CNF_REQ_EXT_BC="CA:false"  # basicConstraint
-      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      CNF_REQ_EXT_EKU="critical,codeSigning"
-      CNF_REQ_EXT_SAN=""  # subjectAltName
-      CNF_REQ_EXT_AIA="@issuer_info"  # authorityInfoAccess
-      CNF_REQ_EXT_CRL=""
-      # CNF_REQ_EXT_EXTRA=""
-      # software-ca.cnf/[codesign_ext]
-      CNF_CA_EXT_KU="critical,digitalSignature"
-      CNF_CA_EXT_BC="CA:false"  # basicConstraint
-      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      CNF_CA_EXT_EKU="critical,codeSigning"
-      CNF_CA_EXT_SAN=""  # subjectAltName
-      CNF_CA_EXT_AIA="@issuer_info"  # authorityInfoAccess
-      CNF_CA_EXT_CRL=""
-      # CNF_CA_EXT_EXTRA=""
-      ;;
-    *)
-      echo "Invalid '$GXEBCT_CA_TYPE' option"
-      ;;
-  esac
-  unset GXEBCT_CA_TYPE
-}
 
 function write_line_or_no
 {
@@ -916,31 +677,31 @@ req_extensions          = $CGCRCF_SECTION_NAME     # Desired extensions
 
 [ ${NODE_TYPE}_dn ]
 countryName               = Country Name (2-letter code)
-countryName_default       = \"$X509_COUNTRY\"
+countryName_default       = $X509_COUNTRY
 countryName_min           = 2
 countryName_max           = 2
 
 stateOrProvinceName             = State or Province Name (full name)
-stateOrProvinceName_default     = \"$X509_STATE\"
+stateOrProvinceName_default     = $X509_STATE
 
 localityName                    = Locality Name (eg, city)
-localityName_default            = \"$X509_LOCALITY\"
+localityName_default            = $X509_LOCALITY
 
-0.organizationName              = \"Organization Name (eg, company)\"
-0.organizationName_default      = \"$X509_ORG\"
+0.organizationName              = Organization Name (eg, company)
+0.organizationName_default      = $X509_ORG
 # we can do this but it is not needed normally :-)
 #1.organizationName             = Second Organization Name (eg, company)
 #1.organizationName_default     = World Wide Web Pty Ltd
 
 organizationalUnitName          = Organizational Unit Name (eg, section)
-organizationalUnitName_default = \"$X509_OU\"
+organizationalUnitName_default = $X509_OU
 
 commonName                      = Common Name (e.g. server FQDN or YOUR name)
-commonName_default              = \"$X509_COMMON\"
+commonName_default              = $X509_COMMON
 commonName_max                  = 64
 
 emailAddress                    = Email Address
-emailAddress_default            = \"$X509_EMAIL\"
+emailAddress_default            = $X509_EMAIL
 emailAddress_max                = 64
 CERT_REQ_EOF
 
@@ -964,12 +725,12 @@ CERT_REQ_EOF
 
   cat << CERT_REQ_EOF | tee -a "$CGCRCF_CNFFILE" >/dev/null
 # domainComponent is not used by 'identity.conf'
-0.domainComponent               = \"Top-level Domain Name (i.e., com, net, org)\"
-0.domainComponent_default       = \"invalid\"
-1.domainComponent               = \"The Domain Name (i.e., example, test, acme)\"
-1.domainComponent_default       = \"example\"
-2.domainComponent               = \"Sub-Domain Name (i.e., www, ocsp, or 'blank')\"
-2.domainComponent_default       = \"\"
+0.domainComponent               = Top-level Domain Name (i.e., com, net, org)
+0.domainComponent_default       = 
+1.domainComponent               = The Domain Name (i.e., example, test, acme)
+1.domainComponent_default       = example
+2.domainComponent               = Sub-Domain Name (i.e., www, ocsp, or 'blank')
+2.domainComponent_default       = 
 
 
 [ $CGCRCF_SECTION_NAME ]
@@ -1217,6 +978,7 @@ function cert_create_certificate {
     unset CCC_CERT_SECTION_NAME
 }
 
+
 function cert_create_revocation_list
 {
     echo "Creating $CERT_NODE_TYPE certificate revocation list (CRL)..."
@@ -1226,6 +988,7 @@ function cert_create_revocation_list
         -config "$PARENT_IA_OPENSSL_CNF_CA_FILE" \
         -out "$CERT_CRL_PEM"
 }
+
 
 function ca_extract_signing_request
 {
@@ -1253,6 +1016,7 @@ function ca_extract_signing_request
         openssl req -noout -text -in "$CERT_CSR_PEM"
     fi
 }
+
 
 ###########################################################
 # Request renewal of this Issuing Authority               #
@@ -1287,6 +1051,7 @@ function ca_renew_certificate
     unset CRC_CERT_OPENSSL_CNF_EXTENSION
 }
 
+
 function hex_decrement
 {
     HEX_VALUE=$1
@@ -1313,6 +1078,7 @@ function display_cert_certificate {
     fi
 }
 
+
 function delete_any_old_cert_files {
     # Yeah, yeah, yeah; destructive but this is a new infrastructure
     if [[ -d "$CERT_KEY_PEM" ]]; then
@@ -1328,15 +1094,6 @@ function delete_any_old_cert_files {
     [[ ${FORCE_DELETE_CONFIG} -eq 1 ]] && delete_cert_config
 }
 
-function get_section_names
-{
-    GSN_NODE_TYPE="$1"
-    GSN_PARENT_IA_NAME="$2"
-    SECTION_NAME_REQ="${GSN_NODE_TYPE}_${GSN_PARENT_IA_NAME}_reqext"
-    SECTION_NAME_CA="${GSN_NODE_TYPE}_${GSN_PARENT_IA_NAME}_ext"
-    unset GSN_NODE_TYPE
-    unset GSN_PARENT_IA_NAME
-}
 
 ##################################################
 # CLI create command                             #
@@ -1357,20 +1114,276 @@ function cmd_create_cert {
         echo "ERROR: PARENT_IA_OPENSSL_CNF_CA_FILE: $PARENT_IA_OPENSSL_CNF_CA_FILE does not exist"
         exit 2
     fi
+
+    # Might be a good time to check if end-user wants to reuse the CSR/REQUEST config file; if not, delete said file
+
+    activate_subjectAltNames=0
     # Capture data entry for distinguished name
     if [[ ! -f "$CERT_OPENSSL_CNF_REQ_FILE" ]]; then
 
         # Create a new OpenSSL
         echo "$CERT_OPENSSL_CNF_REQ_FILE file is missing, recreating ..."
-        data_entry_generic
+        ID_INPUT_DATA=""
+        input_data "Organization" "$X509_ORG"
+        X509_ORG="$ID_INPUT_DATA"
+        input_data "Org. Unit/Section/Division: " "$X509_OU"
+        X509_OU="$ID_INPUT_DATA"
+
+        if [ "$NODE_TYPE" == "server" ]; then
+          echo ""
+          echo "Enter in the domain name into Common Name (NO WILDCARD)"
+          input_data "Common Name: " "$X509_COMMON"
+        else
+          input_data "Common Name: " "$X509_COMMON"
+        fi
+        X509_COMMON="$ID_INPUT_DATA"
+        input_data "Country (2-char max.): " "$X509_COUNTRY"
+        X509_COUNTRY="$ID_INPUT_DATA"
+        input_data "State: " "$X509_STATE"
+        X509_STATE="$ID_INPUT_DATA"
+        input_data "Locality/City: " "$X509_LOCALITY"
+        X509_LOCALITY="$ID_INPUT_DATA"
+        input_data "Contact email: " "$X509_EMAIL"
+        X509_EMAIL="$ID_INPUT_DATA"
+
+        input_data "Base URL: " "$X509_URL_BASE"
+        X509_URL_BASE="$ID_INPUT_DATA"
+
+        X509_URL_OCSP="${X509_URL_BASE}:9080/ocsp"
+        input_data "OCSP URL: " "$X509_URL_OCSP"
+        X509_URL_OCSP="$ID_INPUT_DATA"
+
+        X509_CRL="${X509_URL_BASE}/${CERT_CRL_FNAME}"
+        input_data "CRL URL: " "$X509_CRL"
+        X509_CRL="$ID_INPUT_DATA"
+
+        if [ "$NODE_TYPE" == "server" ]; then
+            echo "Server-type certificate have extra subjectAltNames-capability."
+            read -rp "Do you want SAN feature in your server cert? (N/y): " -eiN
+            REPLY="${REPLY:0:1}"
+            REPLY="${REPLY,}"
+            if [ "$REPLY" == 'y' ]; then
+                activate_subjectAltNames=0
+                echo
+                echo ""
+                echo "This is a SERVER type certificate"
+                echo "   First we will put in all variants of domain names in,"
+                echo "   Then we will put in all variants of IP address in."
+                echo "   Hit ENTER to quit."
+                echo "NOTE: Domain wildcard allowed here"
+                idx=1
+                while true; do
+                    read -rp "Enter in domain name: "
+                    if [ -z "$REPLY" ]; then
+                      break;
+                    fi
+                    if [ $activate_subjectAltNames == 0 ]; then
+                      activate_subjectAltNames=1
+                      CNF_CA_EXT_EXTRA_A+=("[alt_names]")
+		    fi
+	            REPLY="${REPLY,,}"  # make it all lowercase
+                    CNF_CA_EXT_EXTRA_A+=("DNS.$idx = $REPLY")
+                    ((idx++))
+                done
+                echo ""
+                echo "   Hit ENTER to quit."
+                echo "NOTE: No slash, CIDR nor subnet allowed; just plain IP address format"
+                idx=1
+                while true; do
+                    read -rp "Enter in IP address: "
+                    if [ -z "$REPLY" ]; then
+                      break;
+                    fi
+                    if [ $activate_subjectAltNames == 0 ]; then
+                      activate_subjectAltNames=1
+                      CNF_CA_EXT_EXTRA_A+=("[alt_names]")
+		    fi
+                    REPLY="$(echo "$REPLY" | awk '{ print tolower($1) }')"
+                    CNF_CA_EXT_EXTRA_A+=("IP.$idx = $REPLY")
+                    ((idx++))
+                    activate_subjectAltNames=1
+                done
+                echo "CNF_CA_EXT_EXTRA_A[]: ${CNF_CA_EXT_EXTRA_A[*]}"
+	    fi
+        fi
+    else
+        echo "Reusing $CERT_OPENSSL_CNF_REQ_FILE file ..."
     fi
 
     [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $CERT_NODE_TYPE private key ..."
 
-    echo "DEBUG: DEBUG: CA_TYPE: $NODE_TYPE"
-    get_x509v3_extension_by_cert_type "$NODE_TYPE"
+    case "$NODE_TYPE" in
+      server)
+        # shellcheck disable=SC2034
+        # TBD: Remove 'critical" from CNF_REQ_EXT_KU???
+        # TBD: Add 'nonRepudiation" to CNF_REQ_EXT_KU???
+        #      ref: http://wiki.cacert.org/FAQ/subjectAltName
+        CNF_REQ_EXT_KU="nonRepudiation,digitalSignature,keyEncipherment"
+        CNF_REQ_EXT_BC="CA:false"
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        # CNF_REQ_EXT_AKI="keyid,issuer:always"  # used in 802.1ar iDevID
+        # CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier (openssl ca)
+        # Need to remove 'clientAuth' from server extendedKeyUsage; no citation
+        # Need to remove 'nsSGC' from extendedKeyUsage, but no citation
+        # Need to remove 'msSGC' from extendedKeyUsage, but no citation
+        CNF_REQ_EXT_EKU="serverAuth,clientAuth"
+        # CNF_REQ_EXT_SAN="\$ENV::SAN"  # subjectAltName
+        if [ $activate_subjectAltNames != 0 ]; then
+          CNF_REQ_EXT_SAN="@alt_names"  # subjectAltName
+	      fi
+        # CNF_REQ_EXT_AIA="@ocsp_info"
+        # CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_AIA=""
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        # signing-ca.cnf/[server_ext]
+        # email-ca.cnf/[server_ext]
+        CNF_CA_EXT_KU="critical,digitalSignature"
+        CNF_CA_EXT_BC="CA:false"
+        CNF_CA_EXT_SKI="hash"
+        CNF_CA_EXT_AKI="keyid,issuer:always"
+        CNF_CA_EXT_AIA=""  # no need for OCSP nor Issuer info here
+        CNF_CA_EXT_EKU="serverAuth"
+        # Only need serverAuth & clientAuth together if
+        #   making a PEM key that combines private and public key (bad idea)
+        # CNF_CA_EXT_SAN="\$ENV::SAN"  # subjectAltName
+        CNF_CA_EXT_AIA="@ocsp_info"
+        CNF_CA_EXT_CRL="URI:${X509_CRL}"
+        CNF_CA_EXT_EXTRA=""
+  
+        ###
+        ;;
+      client)
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="clientAuth"
+        CNF_REQ_EXT_SAN="email:move"  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        # email-ca.cnf/[client_ext]
+        CNF_CA_EXT_KU="critical,digitalSignature"
+        CNF_CA_EXT_BC="CA:false"
+        CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_CA_EXT_EKU="clientAuth"
+        CNF_CA_EXT_SAN="email:move"  # subjectAltName
+        CNF_CA_EXT_AIA="@ocsp_info"
+        CNF_CA_EXT_CRL="URI:${X509_CRL}"
+        CNF_CA_EXT_EXTRA=""
+        ;;
+      timestamping)
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="critical,timeStamping"
+        CNF_REQ_EXT_SAN=""  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        ;;
+      ocsp)
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="critical,OCSPSigning"
+        CNF_REQ_EXT_SAN=""  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        CNF_CA_EXT_KU="critical,digitalSignature"
+        CNF_CA_EXT_BC="CA:false"
+        CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_CA_EXT_AKI="keyid,issuer"  # authorityKeyIdentifier
+        CNF_CA_EXT_EKU="critical,OCSPSigning"
+        CNF_CA_EXT_SAN=""  # subjectAltName
+        CNF_CA_EXT_AIA=""
+        CNF_CA_EXT_CRL=""
+        CNF_CA_EXT_EXTRA="noCheck = null"
+        ;;
+      email)
+        CNF_REQ_EXT_KU="critical,keyEncipherment"
+        CNF_REQ_EXT_BC="CA:false"  # basicConstraint
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI=""  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="emailProtection,clientAuth"
+        CNF_REQ_EXT_SAN="email:move"  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        # signing-ca.cnf/[email_ext]
+        # email-ca.cnf/[email_ext]
+        CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
+        CNF_CA_EXT_BC="CA:false"  # basicConstraint
+        CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_CA_EXT_EKU="emailProtection,clientAuth,anyExtendedKeyUsage"
+        CNF_CA_EXT_SAN=""  # subjectAltName
+        CNF_CA_EXT_AIA="@issuer_info"
+        CNF_CA_EXT_CRL=""
+        # CNF_CA_EXT_EXTRA=""
+      ;;
+      # encryption supports 802.1ar, Microsoft Encrypted File System
+      encryption)
+        CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"  # keyUsage
+        CNF_REQ_EXT_BC=""  # basicConstraint
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI=""  # authorityKeyIdentifier
+        # email encryption = "emailProtection,clientAuth"
+        # Microsoft Encrypted File System = "emailProtection,msEFS"
+        # merged plain email and MS identity encryption together
+        CNF_REQ_EXT_EKU="emailProtection,clientAuth,msEFS"
+        CNF_REQ_EXT_SAN="email:move"  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        ;;
+      identity)  # there's identity-ca and identity, this here is identity-ca
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"  # basicConstraint
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        # msSmartcardLogin is implementation-dependent, but include here nonetheless
+        CNF_REQ_EXT_EKU="emailProtection,clientAuth,msSmartcardLogin"
+        CNF_REQ_EXT_SAN="email:move"  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        ;;
+      codesign)
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"  # basicConstraint
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="critical,codeSigning"
+        CNF_REQ_EXT_SAN=""  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"  # authorityInfoAccess
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        # software-ca.cnf/[codesign_ext]
+        CNF_CA_EXT_KU="critical,digitalSignature"
+        CNF_CA_EXT_BC="CA:false"  # basicConstraint
+        CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_CA_EXT_EKU="critical,codeSigning"
+        CNF_CA_EXT_SAN=""  # subjectAltName
+        CNF_CA_EXT_AIA="@issuer_info"  # authorityInfoAccess
+        CNF_CA_EXT_CRL=""
+        # CNF_CA_EXT_EXTRA=""
+        ;;
+      *)
+        echo "Invalid '$NODE_TYPE' option"
+        ;;
+    esac
 
-    get_section_names "${NODE_TYPE}" "${PARENT_IA_NAME}"
+    SECTION_NAME_REQ="${NODE_TYPE}_${PARENT_IA_NAME}_reqext"
+    SECTION_NAME_CA="${NODE_TYPE}_${PARENT_IA_NAME}_ext"
+
+    # SAN data entry is needed during CSR file creation
 
     write_generic_cert_req_config_file "$SECTION_NAME_REQ" "$CERT_OPENSSL_CNF_REQ_FILE"
 
@@ -1383,11 +1396,6 @@ function cmd_create_cert {
         "$CERT_OPENSSL_CNF_REQ_FILE" \
         "$CERT_OPENSSL_CNF_REQ_EXTFILE"
 
-#    cert_create_certificate \
-#        "$PARENT_IA_OPENSSL_CNF_CA_FILE" \
-#        "$PARENT_IA_OPENSSL_CNF_CA_EXTFILE" \
-#        "$SECTION_NAME_CA"
-#
     cert_create_certificate \
         "$CERT_OPENSSL_CNF_REQ_FILE" \
         "$PARENT_IA_OPENSSL_CNF_CA_EXTFILE" \
@@ -1427,9 +1435,13 @@ function cmd_renew_cert {
     [[ ${VERBOSITY} -ne 0 ]] && echo "Calling renew certificate..."
     if [[ ! -f "$PARENT_IA_SERIAL_DB" ]]; then
         echo "Serial ID ($PARENT_IA_SERIAL_DB) file is missing; aborting..."; exit 1
+    else
+        echo "Using Serial ID ($PARENT_IA_SERIAL_DB) file ..."; exit 1
     fi
     if [[ ! -f "$PARENT_IA_CRL_DB" ]]; then
         echo "CRL number ($PARENT_IA_CRL_DB) file is missing; aborting..."; exit 1
+    else
+        echo "Using CRL number ($PARENT_IA_CRL_DB) file ..."; exit 1
     fi
     # Check Cert
     if [[ ! -e "$CERT_CERTS_DIR" ]]; then
@@ -1468,9 +1480,174 @@ function cmd_renew_cert {
 
     ca_extract_signing_request
 
-    echo "DEBUG: DEBUG: CA_TYPE: $NODE_TYPE"
-    get_x509v3_extension_by_cert_type "$NODE_TYPE"
-    get_section_names "${NODE_TYPE}" "${PARENT_IA_NAME}"
+    case "$NODE_TYPE" in
+      server)
+        # shellcheck disable=SC2034
+        # TBD: Remove 'critical" from CNF_REQ_EXT_KU???
+        # TBD: Add 'nonRepudiation" to CNF_REQ_EXT_KU???
+        #      ref: http://wiki.cacert.org/FAQ/subjectAltName
+        CNF_REQ_EXT_KU="nonRepudiation,digitalSignature,keyEncipherment"
+        CNF_REQ_EXT_BC="CA:false"
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        # CNF_REQ_EXT_AKI="keyid,issuer:always"  # used in 802.1ar iDevID
+        # CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier (openssl ca)
+        # Need to remove 'clientAuth' from server extendedKeyUsage; no citation
+        # Need to remove 'nsSGC' from extendedKeyUsage, but no citation
+        # Need to remove 'msSGC' from extendedKeyUsage, but no citation
+        CNF_REQ_EXT_EKU="serverAuth,clientAuth"
+        # CNF_REQ_EXT_SAN="\$ENV::SAN"  # subjectAltName
+        CNF_REQ_EXT_SAN="@alt_names"  # subjectAltName
+        # CNF_REQ_EXT_AIA="@ocsp_info"
+        # CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_AIA=""
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        # signing-ca.cnf/[server_ext]
+        # email-ca.cnf/[server_ext]
+        CNF_CA_EXT_KU="critical,digitalSignature"
+        CNF_CA_EXT_BC="CA:false"
+        CNF_CA_EXT_SKI="hash"
+        CNF_CA_EXT_AKI="keyid,issuer:always"
+        CNF_CA_EXT_AIA=""  # no need for OCSP nor Issuer info here
+        CNF_CA_EXT_EKU="serverAuth"
+        # Only need serverAuth & clientAuth together if
+        #   making a PEM key that combines private and public key (bad idea)
+        # CNF_CA_EXT_SAN="\$ENV::SAN"  # subjectAltName
+        CNF_CA_EXT_AIA="@ocsp_info"
+        CNF_CA_EXT_CRL="URI:${X509_CRL}"
+        CNF_CA_EXT_EXTRA=""
+  
+        ###
+        ;;
+      client)
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="clientAuth"
+        CNF_REQ_EXT_SAN="email:move"  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        # email-ca.cnf/[client_ext]
+        CNF_CA_EXT_KU="critical,digitalSignature"
+        CNF_CA_EXT_BC="CA:false"
+        CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_CA_EXT_EKU="clientAuth"
+        CNF_CA_EXT_SAN="email:move"  # subjectAltName
+        CNF_CA_EXT_AIA="@ocsp_info"
+        CNF_CA_EXT_CRL="URI:${X509_CRL}"
+        CNF_CA_EXT_EXTRA=""
+        ;;
+      timestamping)
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="critical,timeStamping"
+        CNF_REQ_EXT_SAN=""  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        ;;
+      ocsp)
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="critical,OCSPSigning"
+        CNF_REQ_EXT_SAN=""  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        CNF_CA_EXT_KU="critical,digitalSignature"
+        CNF_CA_EXT_BC="CA:false"
+        CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_CA_EXT_AKI="keyid,issuer"  # authorityKeyIdentifier
+        CNF_CA_EXT_EKU="critical,OCSPSigning"
+        CNF_CA_EXT_SAN=""  # subjectAltName
+        CNF_CA_EXT_AIA=""
+        CNF_CA_EXT_CRL=""
+        CNF_CA_EXT_EXTRA="noCheck = null"
+        ;;
+      email)
+        CNF_REQ_EXT_KU="critical,keyEncipherment"
+        CNF_REQ_EXT_BC="CA:false"  # basicConstraint
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI=""  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="emailProtection,clientAuth"
+        CNF_REQ_EXT_SAN="email:move"  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        # signing-ca.cnf/[email_ext]
+        # email-ca.cnf/[email_ext]
+        CNF_CA_EXT_KU="critical,digitalSignature,keyEncipherment"
+        CNF_CA_EXT_BC="CA:false"  # basicConstraint
+        CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_CA_EXT_EKU="emailProtection,clientAuth,anyExtendedKeyUsage"
+        CNF_CA_EXT_SAN=""  # subjectAltName
+        CNF_CA_EXT_AIA="@issuer_info"
+        CNF_CA_EXT_CRL=""
+        # CNF_CA_EXT_EXTRA=""
+      ;;
+      # encryption supports 802.1ar, Microsoft Encrypted File System
+      encryption)
+        CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"  # keyUsage
+        CNF_REQ_EXT_BC=""  # basicConstraint
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI=""  # authorityKeyIdentifier
+        # email encryption = "emailProtection,clientAuth"
+        # Microsoft Encrypted File System = "emailProtection,msEFS"
+        # merged plain email and MS identity encryption together
+        CNF_REQ_EXT_EKU="emailProtection,clientAuth,msEFS"
+        CNF_REQ_EXT_SAN="email:move"  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        ;;
+      identity)  # there's identity-ca and identity, this here is identity-ca
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"  # basicConstraint
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        # msSmartcardLogin is implementation-dependent, but include here nonetheless
+        CNF_REQ_EXT_EKU="emailProtection,clientAuth,msSmartcardLogin"
+        CNF_REQ_EXT_SAN="email:move"  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        ;;
+      codesign)
+        CNF_REQ_EXT_KU="critical,digitalSignature"
+        CNF_REQ_EXT_BC="CA:false"  # basicConstraint
+        CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_REQ_EXT_EKU="critical,codeSigning"
+        CNF_REQ_EXT_SAN=""  # subjectAltName
+        CNF_REQ_EXT_AIA="@issuer_info"  # authorityInfoAccess
+        CNF_REQ_EXT_CRL=""
+        # CNF_REQ_EXT_EXTRA=""
+        # software-ca.cnf/[codesign_ext]
+        CNF_CA_EXT_KU="critical,digitalSignature"
+        CNF_CA_EXT_BC="CA:false"  # basicConstraint
+        CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+        CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+        CNF_CA_EXT_EKU="critical,codeSigning"
+        CNF_CA_EXT_SAN=""  # subjectAltName
+        CNF_CA_EXT_AIA="@issuer_info"  # authorityInfoAccess
+        CNF_CA_EXT_CRL=""
+        # CNF_CA_EXT_EXTRA=""
+        ;;
+      *)
+        echo "Invalid '$NODE_TYPE' option"
+        ;;
+    esac
+
+    SECTION_NAME_REQ="${NODE_TYPE}_${PARENT_IA_NAME}_reqext"
+    SECTION_NAME_CA="${NODE_TYPE}_${PARENT_IA_NAME}_ext"
 
     # REQ config file should already be created (could pre-exist-check for one here)
     write_generic_ca_extension_config_file "$SECTION_NAME_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
@@ -1535,6 +1712,10 @@ function cmd_revoke_cert {
 function cmd_verify_cert {
     [[ ${VERBOSITY} -ne 0 ]] && echo "Verify certificate command..."
 
+    if [ ! -f "$CERT_CERT_PEM" ]; then
+        echo "File $CERT_CERT_PEM is missing; aborted."
+        exit 9
+    fi
 # You can use OpenSSL to check the consistency of a private key:
 # openssl rsa -in [privatekey] -check
 
@@ -1628,6 +1809,7 @@ function cmd_verify_cert {
 
     if [[ "$PEER_SIGNATURE" == "rsa" ]]; then
         # check test signature
+        if [ 0 -ne 0 ]; then
         # This is only valid with '--algorithm rsa' option
         # openssl v1.1.1 hasn't finished Digital decryptor/encryptor for ecdsa...
         openssl x509 -in "$CERT_CERT_PEM" -noout -pubkey > "${TMP}/pubkey.pem"
@@ -1648,6 +1830,7 @@ function cmd_verify_cert {
         fi
 
         rm -rf "${TMP}"
+        fi  # commented out due to broke pkeyutl  (ARGH!)
 
         CERT_SERIAL_ID_NEXT=$(cat "${PARENT_IA_SERIAL_DB}")
         hex_decrement "$CERT_SERIAL_ID_NEXT"
@@ -1847,7 +2030,44 @@ elif [[ "$CMD_MODE" == "create" ]]; then
   CERT_NODE_TYPE="$NODE_TYPE"
   ARGOPT_PARENT_CA_NAME="$4"
 elif [[ "$CMD_MODE" == "verify" ]]; then
-  ARGOPT_PARENT_CA_NAME="$3"
+  ARGOPT_CA_TYPE="$3"
+  # root intermediate security component network standalone server client
+  # ocsp email identity encryption codesign timestamping
+  case "$ARGOPT_CA_TYPE" in
+    server)
+      NODE_TYPE="server"
+      ;;
+    client)
+      NODE_TYPE="client"
+      ;;
+    ocsp)
+      NODE_TYPE="ocsp"
+      ;;
+    timestamping)
+      NODE_TYPE="timestamping"
+      ;;
+    email)
+      NODE_TYPE="email"
+      ;;
+    encryption)
+      NODE_TYPE="encryption"
+      ;;
+    codesign)
+      NODE_TYPE="codesign"
+      ;;
+    proxy)
+      NODE_TYPE="codesign"
+      ;;
+    *)
+      cmd_show_syntax_usage
+      echo "Error in CA-TYPE: '$ARGOPT_CA_TYPE' argument."
+      echo "Valid options are server, client, ocsp, timestamping, "
+      echo "       email, encryption, codesign and proxy"
+      exit 255
+      ;;
+  esac
+  CERT_NODE_TYPE="$NODE_TYPE"
+  ARGOPT_PARENT_CA_NAME="$4"
 else
   cmd_show_syntax_usage
   echo "Valid 1st argument values are: create, renew, revoke, verify"
