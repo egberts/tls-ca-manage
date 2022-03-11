@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# File: ca-type.sh
+# Status: design/prototype
+#
+# This is just a demonstrator showing how to fork out openssl.conf into
+# various types of extensions.
 
 function create_node_centric_config {
     OPENSSL_CNF_FNAME=$1

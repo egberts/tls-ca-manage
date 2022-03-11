@@ -1,6 +1,7 @@
 #!/bin/bash
 #
 # File: interca-type.sh
+# Status: prototype/design
 #
 # Creates an extension file that details the
 # relatioship between parent CA and its child CA
