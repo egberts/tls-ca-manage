@@ -1503,11 +1503,14 @@ function delete_any_old_ca_files {
     # Yeah, yeah, yeah; destructive but this is a new infrastructure
     if [[ -d "$IA_DIR" ]]; then
         echo "WHOA! Directory $IA_DIR already exist."
-        echo -n "Do you want to do mass-precision-delete $IA_DIR old-stuff? (N/yes): "
-        read -r DELETE_IA_DIR
+        read -rp "Do you want to do mass-precision-delete of $IA_DIR? (N/yes): " \
+		-eiN DELETE_IA_DIR
+	echo
         if [[ "$DELETE_IA_DIR" =~ y|yes|Y|YES ]]; then
-            echo -n "Asking again: Do you want to selectively-delete $IA_DIR? (N/yes): "
-            read -r DELETE_IA_DIR
+            echo "You probably may lose intermediate and client certificates."
+            read -rp "Do you want to do mass-precision-delete of $IA_DIR? (N/yes): " \
+		    -eiN DELETE_IA_DIR
+	    echo
             if [[ "$DELETE_IA_DIR" =~ y|yes|Y|YES ]]; then
                 if [[ -d "$IA_DIR" ]]; then
                     delete_ca_dirfiles
@@ -2112,7 +2115,7 @@ fi
 
 if [[ ${VERBOSITY} -ne 0 ]]; then
   echo "CA Name: $IA_NAME"
-  echo "Root CA Name: $PARENT_IA_NAME"
+  echo "Parent CA Name: $PARENT_IA_NAME"
   echo "Depth mode: $DEPTH_MODE"
   echo "Main SSL directory: $SSL_DIR"
   echo "Issuing directory: $IA_DIR"

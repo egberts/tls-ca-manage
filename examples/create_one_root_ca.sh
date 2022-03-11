@@ -13,8 +13,8 @@ ${TCEM} create dovecot-imapserver server MyCaRoot
 ${TCEM} create ipsec-server       server MyCaRoot
 ${TCEM} create webmin-server      server MyCaRoot
 
-${TCEM} verify  apache-webserver   MyCaRoot
-${TCEM} verify  postfix-mtaserver   MyCaRoot
-${TCEM} verify  dovecot-imapserver   MyCaRoot
-${TCEM} verify  ipsec-server   MyCaRoot
-${TCEM} verify  webmin-server   MyCaRoot
+${TCEM} verify apache-webserver   server MyCaRoot
+${TCEM} verify postfix-mtaserver  server MyCaRoot
+${TCEM} verify dovecot-imapserver server MyCaRoot
+${TCEM} verify ipsec-server       server MyCaRoot
+${TCEM} verify webmin-server      server MyCaRoot

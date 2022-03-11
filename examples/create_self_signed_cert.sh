@@ -11,4 +11,4 @@ ${TLS_CA_MANAGE} verify acme
 #
 #  Create a self-signed using 521-bit ECDSA
 ${TLS_CA_MANAGE} create -a ecdsa -k 521 secured-acme
-${TLS_CA_MANAGE} verify secured-acme
+${TLS_CA_MANAGE} verify server secured-acme
