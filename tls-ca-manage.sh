@@ -459,6 +459,7 @@ function directory_file_layout {
         IA_CSR_DIR="$IA_DIR"
         IA_CRL_DIR="$IA_DIR/$CRL_DNAME"
         IA_CHAIN_DIR="$IA_DIR"
+        PARENT_IA_CHAIN_DIR="$PARENT_IA_DIR"
         IA_EXT_DIR="$IA_DIR"
         PARENT_IA_EXT_DIR="$PARENT_IA_DIR"
         IA_DB_DIR="$IA_DIR"
@@ -483,6 +484,7 @@ function directory_file_layout {
         IA_CSR_DIR="$SSL_CA_DIR"
         IA_CRL_DIR="$SSL_DIR/$CRL_DNAME"
         IA_CHAIN_DIR="$SSL_CA_DIR"
+        PARENT_IA_CHAIN_DIR="$SSL_CA_DIR"
         IA_EXT_DIR="$SSL_DIR/etc"
         PARENT_IA_EXT_DIR="$IA_EXT_DIR"
         IA_DB_DIR="$IA_DIR/$IA_DB_DNAME"
@@ -514,6 +516,7 @@ function directory_file_layout {
         echo "IA_CSR_DIR: $IA_CSR_DIR"
         echo "IA_CRL_DIR: $IA_CRL_DIR"
         echo "IA_CHAIN_DIR: $IA_CHAIN_DIR"
+        echo "PARENT_IA_CHAIN_DIR: $PARENT_IA_CHAIN_DIR"
         echo "IA_EXT_DIR: $IA_EXT_DIR"
         echo "IA_DB_DIR: $IA_DB_DIR"
         echo "PARENT_IA_DB_DIR: $IA_DB_DIR"
@@ -545,7 +548,7 @@ function directory_file_layout {
         CHAIN_FILETYPE_SUFFIX=".pem"
         # CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$CHAIN_FILENAME_MID$CHAIN_FILENAME_SUFFIX"
         CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX$CHAIN_FILENAME_MID"
-
+        PARENT_CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX$CHAIN_FILENAME_MID"
         PARENT_IA_KEY_FNAME="${PARENT_IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
         IA_KEY_FNAME="${IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
     else
@@ -571,6 +574,7 @@ function directory_file_layout {
         CHAIN_FILENAME_MID="-chain"
         CHAIN_FILETYPE_SUFFIX=".pem"
         CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$IA_NAME$FILENAME_SUFFIX$CHAIN_FILENAME_MID"
+        PARENT_CHAIN_FNAME_PREFIX="$FILENAME_PREFIX$PARENT_IA_NAME$FILENAME_SUFFIX$CHAIN_FILENAME_MID"
 
         PARENT_IA_KEY_FNAME="${PARENT_IA_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
         PARENT_IA_SERIAL_FNAME="$FILENAME_PREFIX$PARENT_IA_NAME$FFNAME_CRL.srl"
@@ -583,6 +587,7 @@ function directory_file_layout {
     PARENT_IA_CERT_FNAME="${PARENT_CERT_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
     IA_CRL_FNAME="${CRL_FNAME_PREFIX}${PEM_FILETYPE_SUFFIX}"
     IA_CHAIN_FNAME="${CHAIN_FNAME_PREFIX}${CHAIN_FILETYPE_SUFFIX}"
+    PARENT_IA_CHAIN_FNAME="${PARENT_CHAIN_FNAME_PREFIX}${CHAIN_FILETYPE_SUFFIX}"
 
     if [[ "$VERBOSITY" -gt 1 ]]; then
         echo "PARENT_IA_KEY_FNAME: $PARENT_IA_KEY_FNAME"
@@ -592,6 +597,7 @@ function directory_file_layout {
         echo "PARENT_IA_CERT_FNAME: $PARENT_IA_CERT_FNAME"
         echo "IA_CRL_FNAME: $IA_CRL_FNAME"
         echo "IA_CHAIN_FNAME: $IA_CHAIN_FNAME"
+        echo "PARENT_IA_CHAIN_FNAME: $PARENT_IA_CHAIN_FNAME"
     fi
 
     PARENT_IA_KEY_PEM="$PARENT_IA_KEY_DIR/$PARENT_IA_KEY_FNAME"
@@ -601,6 +607,7 @@ function directory_file_layout {
     PARENT_IA_CERT_PEM="$PARENT_IA_CERTS_DIR/$PARENT_IA_CERT_FNAME"
     IA_CRL_PEM="$IA_CRL_DIR/$IA_CRL_FNAME"
     IA_CHAIN_PEM="$IA_CHAIN_DIR/$IA_CHAIN_FNAME"
+    PARENT_IA_CHAIN_PEM="$PARENT_IA_CHAIN_DIR/$PARENT_IA_CHAIN_FNAME"
     IA_INDEX_DB="$IA_INDEX_DB_DIR/$IA_INDEX_FNAME"
     PARENT_IA_INDEX_DB="$PARENT_IA_INDEX_DB_DIR/$PARENT_IA_INDEX_FNAME"
     IA_SERIAL_DB="$IA_SERIAL_DB_DIR/$IA_SERIAL_FNAME"
@@ -1296,20 +1303,131 @@ function ca_create_public_key
 }
 
 
+function write_ca_chain_pem_file {
+  chaining=1
+  echo "Starting a $PARENT_TYPE_STR chain certificate ..."
+  # If evoked, we absolutely need to have a parent CA,
+  #    for its not a 'root' CA type nor a self-referencing CA.
+  # $SSL_DIR is that relative despite traditional/centralized and nested/flat choice.
+
+  # start off these variables for dynamic traversing up each CA level
+  # All links are in a relative directory format to $SSL_DIR
+  # convert its own .crt PEM into a relative filespec
+  abs_parent_cert_pem="$PARENT_IA_CERT_PEM"
+  rel_parent_cert_pem="$(realpath --relative-base="$SSL_DIR" "$PARENT_IA_CERT_PEM")"
+  abs_parent_dir="$PARENT_IA_DIR"
+  rel_parent_dir="$(realpath --relative-base="$SSL_DIR" "$PARENT_IA_DIR")"
+
+  # Create support files at this CA level to aid future chaining effort of PEM files
+  # PARENT_DIR contains relative dirpath to its parent CA
+  echo "$rel_parent_dir" > "$IA_DIR/PARENT_DIR"
+
+  # PARENT_CERT contains relative filespec of the Parent Cert (.crt) PEM file
+  echo "$rel_ia_cert_pem" > "$IA_DIR/PARENT_CERT_TO_CHAIN"
+
+  abs_ia_cert_pem="$IA_CERT_PEM"
+  rel_ia_cert_pem="$(realpath -s --relative-base="$SSL_DIR" "$IA_CERT_PEM" )"
+
+  echo "  Creating $IA_CHAIN_PEM chain-bundle file ..."
+  if [[ ${VERBOSITY} -ne 0 ]]; then
+    echo "  cp ${abs_ia_cert_pem} ${IA_CHAIN_PEM}"
+  fi
+  cp "${abs_ia_cert_pem}" "${IA_CHAIN_PEM}"
+
+  # Go to next level up
+  while [ "$chaining" != "0" ]; do
+
+    # If parent cert is the same as this IA cert or is empty, quit the loop
+    if [ "${rel_parent_cert_pem}" == "${rel_ia_cert_pem}" \
+         -o -z "${rel_parent_cert_pem}" ]; then
+      chaining=0
+      echo "No further chaining found."
+      break
+    fi
+
+    echo "  Appending $rel_parent_cert_pem to chain-bundle file ..."
+    cat "${abs_parent_cert_pem}" >> "${IA_CHAIN_PEM}"
+
+    # Advance chain link
+    rel_ia_cert_pem="$rel_parent_cert_pem"
+    abs_ia_cert_pem="$abs_parent_cert_pem"
+
+    # Fetch next chain link
+    abc_parent_dir_file="${abs_parent_dir}/PARENT_DIR"
+    if [ ! -f "$abs_parent_dir_file" ]; then
+      # silently break; this is the nominal scenario
+      break
+    fi
+    if [ ! -r "$abs_parent_dir_file" ]; then
+      echo "Directory '$abs_parent_file' is not readable."
+      break
+    fi
+
+    # this is the parent chain link being overwritten with a new chain
+    rel_parent_dir_file="$(cat "$abs_parent_dir_file")"
+    abs_parent_dir_file="$(readlink --relative-base="$SSL_DIR" "$rel_parent_dir_file")"
+    if [ ! -d "$abs_parent_dir_file" ]; then
+      echo "Directory '$abs_parent_dir' from PARENT_DIR does not exist."
+      break
+    fi
+    if [ ! -r "$abs_parent_dir" ]; then
+      echo "Directory '$abs_parent_dir' from PARENT_DIR is not readable."
+      break
+    fi
+
+    # pre-check for a valid parent .crt PEM link from PARENT_CERT file
+    rel_parent_cert_pem="$(cat "${abs_parent_dir}/PARENT_CERT_TO_CHAIN")"
+    if [ -z "$rel_parent_cert_pem" ]; then
+      echo "WARNING: Empty PARENT_CA file in $rel_parent_cert_pem"
+      break
+    fi
+    abs_parent_cert_pem="$(readlink -e "$rel_parent_cert_pem")"
+    if [ ! -r "${abs_parent_cert_pem}" ]; then
+      echo "WARNING: File $abs_parent_cert_pem is not readable (PARENT_CERT_TO_CHAIN)"
+      break
+    fi
+  done
+  change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_CHAIN_PEM"
+  echo "Chaining done."
+}
+
+
+# Creates a chaining effect; does two things
+#   1. writes the PARENT_IA_CERT_PEM filespec into its ${IA_CHAIN_DIR}/PARENT_CERT
+#   2. navigates the chain links while writing out a chain-bundle file
 function ca_create_chain_certificate
 {
-    # chains are made only in non-root depth mode
+  echo "SSL_DIR: $SSL_DIR"
+  echo "PARENT_IA_CHAIN_DIR: $PARENT_IA_CHAIN_DIR"
+
+  if [ "$NODE_TYPE" != 'root' ]; then
+
+    # chains are made only in non-root depth mode (could have intermediate as a root)
     if [[ "$DEPTH_MODE" != "root" ]]; then
-        echo "Creating $PARENT_TYPE_STR chain certificate ..."
-        echo "cat ${IA_CERT_PEM} ${PARENT_IA_CERT_PEM} > ${IA_CHAIN_PEM}"
-        cat "${IA_CERT_PEM}" "${PARENT_IA_CERT_PEM}" > "${IA_CHAIN_PEM}"
-        change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_CHAIN_PEM"
+
+      if [ "$PARENT_CA" != "$IA_CERT_PEM" ]; then
+
+        # Most definitely a chain-bundle thingie to do here
+        write_ca_chain_pem_file
+      else
+        # regardless of -p option
+        # no need to write PARENT_CA file for self-referenced parent CA
+        echo "WARNING: No chain-bundled PEM file constructed for $NODE_TYPE cert."
+        echo "INFO:    it is probably a self-signed cert."
+      fi
+    else
+      # no need to write PARENT_CA file for top-level CA
+      echo "INFO: Skipping chain-bundled PEM file because top-level cert."
     fi
+  else
+    # no need to write PARENT_CA file for 'root'
+    echo "INFO: Skipping chain-bundled PEM file because $NODE_TYPE cert."
+  fi
 }
 
 
 #########################################################
-# Create the CA node's signing request certificate      #
+# Create the CA nodes signing request certificate       #
 #########################################################
 function ca_create_csr
 {
@@ -1340,7 +1458,7 @@ function ca_create_csr
 }
 
 ###############################################
-# Parent CA accept CA node's CSR by trusting  #
+# Parent CA accept CA nodes CSR by trusting   #
 ###############################################
 function ca_create_certificate {
     local IA_OPENSSL_CNF_EXTFILE IA_OPENSSL_CNF_EXTENSION
@@ -1371,8 +1489,6 @@ function ca_create_certificate {
         fi
         change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_CERT_PEM"
     fi
-
-    ca_create_chain_certificate
 }
 
 function ca_create_revocation_list
@@ -1589,11 +1705,9 @@ function cmd_create_ca {
 
     ca_create_certificate "$IA_EXT_FNAME" "$THIS_SECTION"
 
-    ca_create_revocation_list
+    ca_create_chain_certificate
 
-    # Save Parent CA
-    REL_PARENT_IA_PATH=$(realpath --relative-to="$SSL_DIR" "$PARENT_IA_DIR")
-    echo "$REL_PARENT_IA_PATH" > "$IA_DIR/PARENT_CA"
+    ca_create_revocation_list
 
     # Clean up
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_INDEX_DB"
@@ -1712,7 +1826,7 @@ function cmd_renew_ca {
 function cmd_revoke_ca {
 
     echo "Revoking $IA_CERT_PEM PEM file..."
-    # Extract serial ID from this CRT PEM file
+    # Extract serial ID from this .crt PEM file
     SERIAL_ID=$(openssl x509 -noout -serial -in $IA_CERT_PEM | awk -F= '{print $2}')
     echo "Extracted serial id $SERIAL_ID from that PEM file."
 
@@ -1871,7 +1985,7 @@ function cmd_verify_ca {
 
         rm -rf "${TMP}"
 
-        # Extract serial ID from CRT PEM file
+        # Extract serial ID from .crt PEM file
         SERIAL_ID=$(openssl x509 -noout -serial ${CIPHER_ARG_PASSIN} -in $IA_CERT_PEM | awk -F= '{print $2}')
         CA_NEWCERT_CURRENT_PEM="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${SERIAL_ID}.pem"
 
