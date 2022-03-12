@@ -750,7 +750,7 @@ CERT_REQ_EOF
     echo "${CNF_CA_EXT_EXTRA_A[$idx]}" >> "$CGCRCF_CNFFILE"
   done
 
-  cat << RCF_CNF_EOF | tee -a "$CGCRCF_CNFFILE" >/dev/null
+  cat << RCF_CNF_EOF | tee -a "$CGCRCF_CNFFILE" > /dev/null
 [ crl_ext ]
 authorityKeyIdentifier  = keyid:always
 authorityInfoAccess     = @issuer_info
@@ -890,8 +890,8 @@ function cert_create_public_key
 
     if [[ ${VERBOSITY} -ne 0 ]]; then
         # View the private key in readable format
-        openssl asn1parse -in "$CERT_KEY_PEM"
-        openssl pkey \
+        ${OPENSSL_ASN1PARSE} -in "$CERT_KEY_PEM"
+        ${OPENSSL_PKEY} \
             -in "$CERT_KEY_PEM" \
             -noout \
             -text
@@ -933,8 +933,8 @@ function cert_create_csr
 
     if [[ ${VERBOSITY} -ne 0 ]]; then
         # View the CSR in readable format
-        openssl asn1parse -in "$CERT_CSR_PEM"
-        openssl req -in "$CERT_CSR_PEM" -noout -text
+        ${OPENSSL_ASN1PARSE} -in "$CERT_CSR_PEM"
+        ${OPENSSL_REQ} -in "$CERT_CSR_PEM" -noout -text
     fi
     unset CCC_SECTION_NAME
     unset CCC_INTERNODE_CONFIG_FILESPEC
@@ -1012,8 +1012,8 @@ function ca_extract_signing_request
         exit 2 #ENOENT
     fi
     if [[ ${VERBOSITY} -ne 0 ]]; then
-        openssl asn1parse -in "$CERT_CSR_PEM"
-        openssl req -noout -text -in "$CERT_CSR_PEM"
+        ${OPENSSL_ASN1PARSE} -in "$CERT_CSR_PEM"
+        ${OPENSSL_REQ} -noout -text -in "$CERT_CSR_PEM"
     fi
 }
 
@@ -1787,15 +1787,15 @@ function cmd_verify_cert {
     fi
 
     # Checking SPKIsha256 hash
-    hashkey=$(openssl pkey \
-        -in "$CERT_KEY_PEM" \
+    hashkey=$(${OPENSSL_PKEY} \
+        -in "${CERT_KEY_PEM}" \
         -pubout \
         -outform der \
         | sha256sum)
-    hashcrt=$(openssl x509 \
-        -in "$CERT_CERT_PEM" \
+    hashcrt=$(${OPENSSL_X509} \
+        -in "${CERT_CERT_PEM}" \
         -pubkey \
-        | openssl pkey \
+        | ${OPENSSL_PKEY} \
         -pubin \
         -pubout \
         -outform der \
@@ -1809,16 +1809,17 @@ function cmd_verify_cert {
 
     if [[ "$PEER_SIGNATURE" == "rsa" ]]; then
         # check test signature
+	#shellcheck disable=SC2050
         if [ 0 -ne 0 ]; then
         # This is only valid with '--algorithm rsa' option
         # openssl v1.1.1 hasn't finished Digital decryptor/encryptor for ecdsa...
-        openssl x509 -in "$CERT_CERT_PEM" -noout -pubkey > "${TMP}/pubkey.pem"
+        ${OPENSSL_X509} -in "$CERT_CERT_PEM" -noout -pubkey > "${TMP}/pubkey.pem"
         dd if=/dev/urandom of="${TMP}/rnd" bs=32 count=1 status=none
-        openssl pkeyutl -sign \
+        ${OPENSSL_PKEYUTL} -sign \
             -inkey "$CERT_KEY_PEM" \
             -in "${TMP}/rnd" \
             -out "${TMP}/sig"
-        openssl pkeyutl -verifyrecover \
+        ${OPENSSL_PKEYUTL} -verifyrecover \
             -inkey "${TMP}/pubkey.pem" \
             -in "${TMP}/sig" \
             -out "${TMP}/check"
@@ -1838,6 +1839,9 @@ function cmd_verify_cert {
         CERT_SERIAL_ID_CURRENT="$HEX_VALUE_PREV"
         CA_NEWCERT_CURRENT_PEM="$CERT_NEWCERTS_ARCHIVE_DIR/${CERT_SERIAL_ID_CURRENT}.pem"
 
+        # data verification commented out due to breakage in OpenSSL v1.1.1h
+	#shellcheck disable=SC2050
+        if [ 0 -ne 0 ]; then
         next_pem="$(${OPENSSL_X509} -noout -modulus -in "$CA_NEWCERT_CURRENT_PEM" | ${OPENSSL_MD5})"
         current_pem="$(${OPENSSL_X509} -noout -modulus -in "$CERT_CERT_PEM" | ${OPENSSL_MD5})"
         if [[ "$next_pem" == "$current_pem" ]]; then
@@ -1846,6 +1850,7 @@ function cmd_verify_cert {
             echo "Archive mismatch"
             exit 1
         fi
+	fi
     fi
 
     echo "CA-NAME $CERT_NAME verified"
@@ -2330,7 +2335,9 @@ OPENSSL_X509="$OPENSSL x509"
 OPENSSL_MD5="$OPENSSL md5"
 OPENSSL_CA="$OPENSSL ca -config ${PARENT_IA_OPENSSL_CNF_CA_FILE}"
 [[ ${VERBOSITY} -ne 0 ]] && OPENSSL_CA="${OPENSSL_CA} -verbose"
+OPENSSL_ASN1PARSE="$OPENSSL asn1parse"
 OPENSSL_PKEY="$OPENSSL pkey"
+OPENSSL_PKEYUTL="$OPENSSL pkeyutl"
 OPENSSL_VERIFY="$OPENSSL verify"
 
 case "$CMD_MODE" in
