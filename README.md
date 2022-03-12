@@ -13,8 +13,8 @@ Beats EasyRSA.  Beats all online CA providers. Definitely beats using OpenSSL di
 That's how simple it should be to create a CA ecosystem:
 ```
   tls-ca-manage.sh create root
-  tls-ca-manage.sh create -p root intermediate-ca
-  tls-cert-manage.sh create -p intermediate-ca my-acme-company
+  tls-ca-manage.sh create -p root my-intermediate-ca
+  tls-cert-manage.sh create my-web-site server my-intermediate-ca
 ```
 
 # What else can tls-ca-manage do?
