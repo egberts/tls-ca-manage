@@ -738,6 +738,13 @@ certificates should still be the preferred method to secure your public service.
 2. [Let's Encrypt][lets_encrypt] is a free, automated, and open Certificate
    Authority.
 
+Why in Bash Script?
+=====
+I love how meta variables can be leverage for templating various file layouts.
+  
+Written, developed, and testd using JetBrain PyCharm, community-edition with Bash Pro plugin for excellent step-by-step debugging while viewing ALL variables, defined or unused.
+  
+# References 
 [cacert]: http://www.cacert.org/
 [cacert_inclusion]: http://wiki.cacert.org/InclusionStatus
 [cert_auto]: https://github.com/berico-rclayton/certificate-automation
