@@ -52,6 +52,9 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
  * No UNIX root account required (enforces **`ssl-cert`** supplemental group)
  * see actual commands and argument settings via verbosity level 
  * And lastly, correct generation of `openssl.cnf` file with all sections properly crossreferences to each other as well as to other CA nodes' configuration file.
+ 
+[![Lint Code Base](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml)
+[![Codacy Security Scan](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml)
 
 # Install
 
@@ -758,7 +761,3 @@ References
 * [wiki_san](https://en.wikipedia.org/wiki/Subject_Alternative_Name)
 * [Project XCA](http://sourceforge.net/projects/xca/)
 * [Be Your Own CA](http://www.g-loaded.eu/2005/11/10/be-your-own-ca/)
-
-[![Lint Code Base](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml)
-[![Codacy Security Scan](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml)
-  
