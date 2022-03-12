@@ -157,7 +157,7 @@ function create_internode_config
     else
         PATHLEN_OPTION=""
     fi
-    CURRENT_TIMESTAMP=`date`
+    CURRENT_TIMESTAMP="$(date)"
     echo """#
 # File: $INTERNODE_CONFIG_FILESPEC
 #
