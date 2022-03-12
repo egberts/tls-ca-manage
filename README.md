@@ -747,16 +747,16 @@ Written, developed, and testd using JetBrain PyCharm, community-edition with Bas
 References
 ====
   
-[cacert]: http://www.cacert.org/
-[cacert_inclusion]: http://wiki.cacert.org/InclusionStatus
-[cert_auto]: https://github.com/berico-rclayton/certificate-automation
-[docker_ca]: https://docs.docker.com/engine/security/https/
-[lets_encrypt]: https://letsencrypt.org/
-[ovpn_scripts]: http://openvpn.net/index.php/open-source/documentation/howto.html#pki
-[tldp_certs]: http://www.tldp.org/HOWTO/SSL-Certificates-HOWTO/x195.html
-[wiki_ma]: https://en.wikipedia.org/wiki/Mutual_authentication
-[wiki_san]: https://en.wikipedia.org/wiki/Subject_Alternative_Name
-[xca]: http://sourceforge.net/projects/xca/
-[yourca_tut]: http://www.g-loaded.eu/2005/11/10/be-your-own-ca/
+[CACert](http://www.cacert.org/)
+[Inclusion Status, CACert](http://wiki.cacert.org/InclusionStatus)
+[Certificate Automation, by Berico-Rclayton, Github](https://github.com/berico-rclayton/certificate-automation)
+[Certificate Authority, byDocker Engine Security](https://docs.docker.com/engine/security/https/)
+[Let's Encrypt](https://letsencrypt.org/)
+[PKI, by OpenVPN](http://openvpn.net/index.php/open-source/documentation/howto.html#pki)
+[X193 TLS Certificates](http://www.tldp.org/HOWTO/SSL-Certificates-HOWTO/x195.html)
+[wiki_ma](https://en.wikipedia.org/wiki/Mutual_authentication)
+[wiki_san](https://en.wikipedia.org/wiki/Subject_Alternative_Name)
+[Project XCA](http://sourceforge.net/projects/xca/)
+[Be Your Own CA](http://www.g-loaded.eu/2005/11/10/be-your-own-ca/)
 
 [![Lint Code Base](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml)
