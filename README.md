@@ -17,7 +17,6 @@ That's how simple it should be to create a CA ecosystem:
   tls-cert-manage.sh create my-web-site server my-intermediate-ca
 ```
 
-[![Lint Code Base](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml)
 [![Codacy Security Scan](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml)
 
 # What else can tls-ca-manage do?
