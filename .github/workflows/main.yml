@@ -1,9 +1,9 @@
 on:
   push:
     branches:
-      - master
+      - unknown
 
-name: 'Trigger: Push action'
+name: 'delete me'
 
 jobs:
   shellcheck:
