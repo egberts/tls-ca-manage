@@ -341,12 +341,12 @@ case "$CA_TYPE" in
     CNF_REQ_EXT_BC="CA:false"  # basicConstraint
     CNF_REQ_EXT_KU="critical,digitalSignature,keyEncipherment"
     CNF_REQ_EXT_EKU="emailProtection,clientAuth"
-encrypt_key             = yes                   # Protect private key
-prompt                  = no                    # Don't prompt for DN
-distinguished_name      = ca_dn                 # DN section
-req_extensions          = ca_reqext             # Desired extensions
-keyUsage                = critical,digitalSignature,keyEncipherment
-basicConstraints        = CA:false
+# encrypt_key             = yes                   # Protect private key
+# prompt                  = no                    # Don't prompt for DN
+# distinguished_name      = ca_dn                 # DN section
+# req_extensions          = ca_reqext             # Desired extensions
+# keyUsage                = critical,digitalSignature,keyEncipherment
+# basicConstraints        = CA:false
     ;;
   codesign)
     CNF_REQ_PROMPT="yes"
