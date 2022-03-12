@@ -17,6 +17,9 @@ That's how simple it should be to create a CA ecosystem:
   tls-cert-manage.sh create my-web-site server my-intermediate-ca
 ```
 
+[![Lint Code Base](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml)
+[![Codacy Security Scan](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml)
+
 # What else can tls-ca-manage do?
 
 Certificate Authority Management tool is witten in bash shell.  Runs on any platform that runs OpenSSL.
@@ -52,9 +55,6 @@ Fret no more, this tool may help you.  I did all the hard work and made it easy 
  * No UNIX root account required (enforces **`ssl-cert`** supplemental group)
  * see actual commands and argument settings via verbosity level 
  * And lastly, correct generation of `openssl.cnf` file with all sections properly crossreferences to each other as well as to other CA nodes' configuration file.
- 
-[![Lint Code Base](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/lint_code_base.yml)
-[![Codacy Security Scan](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml/badge.svg)](https://github.com/egberts/tls-ca-manage/actions/workflows/codacy.yml)
 
 # Install
 
