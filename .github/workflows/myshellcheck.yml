@@ -3,7 +3,7 @@ on:
     branches:
       - master
 
-name: 'Trigger: Push action'
+name: 'MyShellcheck'
 
 jobs:
   shellcheck:
