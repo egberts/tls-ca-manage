@@ -16,7 +16,7 @@ jobs:
       env:
         SHELLCHECK_OPTS: -e SC2059 -e SC2034 -e SC1090
       with:
-        ignore_paths: ignoreme ignoremetoo
+        ignore_paths: tests
         ignore_names: ignorable.sh
         severity: error
         scandir: '.'
