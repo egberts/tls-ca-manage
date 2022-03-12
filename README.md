@@ -744,7 +744,8 @@ I love how meta variables can be leverage for templating various file layouts.
   
 Written, developed, and testd using JetBrain PyCharm, community-edition with Bash Pro plugin for excellent step-by-step debugging while viewing ALL variables, defined or unused.
   
-# References 
+# References
+====
   
 [cacert]: http://www.cacert.org/
 [cacert_inclusion]: http://wiki.cacert.org/InclusionStatus
