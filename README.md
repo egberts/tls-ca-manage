@@ -12,8 +12,8 @@ Beats EasyRSA.  Beats all online CA providers. Definitely beats using OpenSSL di
 
 That's how simple it should be to create a CA ecosystem:
 ```
-  tls-ca-manage.sh create MyPrivateRootCA root
-  tls-ca-manage.sh create -p MyPrivateRootCA my-intermediate-ca
+  tls-ca-manage.sh create -t root MyPrivateRootCA
+  tls-ca-manage.sh create -p MyPrivateRootCA -t intermediate my-intermediate-ca
   tls-cert-manage.sh create my-web-site server my-intermediate-ca
 ```
 
@@ -21,7 +21,7 @@ That's how simple it should be to create a CA ecosystem:
 
 # What else can tls-ca-manage do?
 
-Certificate Authority Management tool is witten in bash shell.  Runs on any platform that runs OpenSSL.
+Certificate Authority Management tool is witten in bash shell.  Runs on any platform that runs OpenSSL v1.1.1 or v3.0
 
 If you have ANY of the following:
 
