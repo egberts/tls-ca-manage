@@ -1980,6 +1980,7 @@ function cmd_verify_ca {
     fi
 
     # disabled until OpenSSL 3.0
+    #shellcheck disable=SC2050
     if [ 0 -ne 0 ]; then
     # Checking SPKIsha256 hash
     #shellcheck disable=SC2086
