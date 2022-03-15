@@ -140,6 +140,16 @@ X509_SUFFIX=""
 CNF_CA_EXT_EXTRA=""
 CNF_CA_EXT_EXTRA_A=()
 
+execute() {
+  if [[ "$VERBOSITY" -ge 1 || -n "$DRY_RUN" ]]; then
+    echo "COMMAND: $@"
+  fi
+  if [ -z "$DRY_RUN" ]; then
+    $@
+    return $?
+  fi
+}
+
 function cmd_show_syntax_usage {
   cat << SYNTAX_EOF | more
  Usage:
@@ -675,6 +685,8 @@ prompt                  = yes                   # Prompt for DN
 distinguished_name      = ${NODE_TYPE}_dn         # DN template
 req_extensions          = $CGCRCF_SECTION_NAME     # Desired extensions
 
+# insert [ v3_ca ] here to compensate for macOS bastardizing OpenSSH
+
 [ ${NODE_TYPE}_dn ]
 countryName               = Country Name (2-letter code)
 countryName_default       = $X509_COUNTRY
@@ -869,7 +881,7 @@ function cert_create_public_key
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$CERT_KEY_PEM"
 
     # shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_GENPKEY} \
+    execute ${OPENSSL_GENPKEY} \
         ${OPENSSL_ALGORITHM} \
         -text \
         -outform PEM \
@@ -890,8 +902,8 @@ function cert_create_public_key
 
     if [[ ${VERBOSITY} -ne 0 ]]; then
         # View the private key in readable format
-        ${OPENSSL_ASN1PARSE} -in "$CERT_KEY_PEM"
-        ${OPENSSL_PKEY} \
+        execute ${OPENSSL_ASN1PARSE} -in "$CERT_KEY_PEM"
+        execute ${OPENSSL_PKEY} \
             -in "$CERT_KEY_PEM" \
             -noout \
             -text
@@ -912,7 +924,7 @@ function cert_create_csr
 
     # Do not use -keyout, we have cert_create_public_key() function for that
     # shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL} req -config "${CCC_CERT_CONFIG_FILESPEC}" \
+    execute ${OPENSSL} req -config "${CCC_CERT_CONFIG_FILESPEC}" \
         -reqexts "$CCC_SECTION_NAME" \
         -new \
         -key "$CERT_KEY_PEM" \
@@ -933,8 +945,8 @@ function cert_create_csr
 
     if [[ ${VERBOSITY} -ne 0 ]]; then
         # View the CSR in readable format
-        ${OPENSSL_ASN1PARSE} -in "$CERT_CSR_PEM"
-        ${OPENSSL_REQ} -in "$CERT_CSR_PEM" -noout -text
+        execute ${OPENSSL_ASN1PARSE} -in "$CERT_CSR_PEM"
+        execute ${OPENSSL_REQ} -in "$CERT_CSR_PEM" -noout -text
     fi
     unset CCC_SECTION_NAME
     unset CCC_INTERNODE_CONFIG_FILESPEC
@@ -950,7 +962,7 @@ function cert_create_certificate {
     CCC_CERT_OPENSSL_CNF_EXTFILE="$2"
     CCC_CERT_SECTION_NAME="$3"
     # shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_CA} \
+    execute ${OPENSSL_CA} \
         -batch \
         ${IA_OPENSSL_CA_OPT} \
         -extfile "$CCC_CERT_OPENSSL_CNF_EXTFILE" \
@@ -983,7 +995,7 @@ function cert_create_revocation_list
 {
     echo "Creating $CERT_NODE_TYPE certificate revocation list (CRL)..."
     # shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_CA} \
+    execute ${OPENSSL_CA} \
         -gencrl \
         -config "$PARENT_IA_OPENSSL_CNF_CA_FILE" \
         -out "$CERT_CRL_PEM"
@@ -998,7 +1010,7 @@ function ca_extract_signing_request
     # We are at the mercy of CA_CERT_PEM being the latest
     # and ALSO in its index.txt file as well.
     # shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_X509} -x509toreq \
+    execute ${OPENSSL_X509} -x509toreq \
        -in "$CERT_CERT_PEM" \
        -signkey "$CERT_KEY_PEM" \
        -out "$CERT_CSR_PEM"
@@ -1012,8 +1024,8 @@ function ca_extract_signing_request
         exit 2 #ENOENT
     fi
     if [[ ${VERBOSITY} -ne 0 ]]; then
-        ${OPENSSL_ASN1PARSE} -in "$CERT_CSR_PEM"
-        ${OPENSSL_REQ} -noout -text -in "$CERT_CSR_PEM"
+        execute ${OPENSSL_ASN1PARSE} -in "$CERT_CSR_PEM"
+        execute ${OPENSSL_REQ} -noout -text -in "$CERT_CSR_PEM"
     fi
 }
 
@@ -1027,7 +1039,7 @@ function ca_renew_certificate
     CRC_CERT_OPENSSL_CNF_EXTENSION="$2"
     # DO NOT USE 'openssl x509', because it lacks DB accounting
     # shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_CA} \
+    execute ${OPENSSL_CA} \
         -verbose \
         ${IA_OPENSSL_CA_OPT} \
         -extfile "${CRC_CERT_OPENSSL_CNF_EXTFILE}" \
@@ -1286,8 +1298,8 @@ function cmd_create_cert {
         # CNF_REQ_EXT_EXTRA=""
         ;;
       ocsp)
-        CNF_REQ_EXT_KU="critical,digitalSignature"
-        CNF_REQ_EXT_BC="CA:false"
+        CNF_REQ_EXT_KU="nonRepudiation,digitalSignature,keyEncipherment"
+        CNF_REQ_EXT_BC="CA:true"
         CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
         CNF_REQ_EXT_AKI="keyid:always"  # authorityKeyIdentifier
         CNF_REQ_EXT_EKU="critical,OCSPSigning"
@@ -1295,15 +1307,32 @@ function cmd_create_cert {
         CNF_REQ_EXT_AIA="@issuer_info"
         CNF_REQ_EXT_CRL=""
         # CNF_REQ_EXT_EXTRA=""
-        CNF_CA_EXT_KU="critical,digitalSignature"
-        CNF_CA_EXT_BC="CA:false"
+        ###CNF_CA_EXT_KU="critical,digitalSignature" #original
+        # CNF_CA_EXT_KU="cRLSign, keyCertSign"  # comment out for a test cert
+        CNF_CA_EXT_BC="CA:true"  # should be 'critical,CA:true' but some SW choke on critical extensions
         CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
-        CNF_CA_EXT_AKI="keyid,issuer"  # authorityKeyIdentifier
+        CNF_CA_EXT_AKI="keyid:always,issuer:always"  # authorityKeyIdentifier
         CNF_CA_EXT_EKU="critical,OCSPSigning"
         CNF_CA_EXT_SAN=""  # subjectAltName
         CNF_CA_EXT_AIA=""
         CNF_CA_EXT_CRL=""
         CNF_CA_EXT_EXTRA="noCheck = null"
+	#
+	# Defer this 'mini-HOWTO' until at the end?
+	#
+	# ####################
+        # # Start the server #
+        # ####################
+        # 
+        # # Use test-certificate.pem as response signer.
+        # openssl ocsp -CApath ./CA/certs \
+	#     -index CA/index.txt \
+	#     -port 5000 -\
+	#     rkey test-certificate.key \
+	#     -rsigner test-certificate.pem \
+	#     -CA CA/cacert.pem \
+	#     -text
+        # 
         ;;
       email)
         CNF_REQ_EXT_KU="critical,keyEncipherment"
@@ -1685,7 +1714,7 @@ function cmd_revoke_cert {
     # -keyfile and -cert are not needed if an openssl.cnf is proper
     REVOKING_CERT_FILE="$CERT_NEWCERTS_ARCHIVE_DIR/$CURRENT_SERIAL_ID.pem"
 
-    ${OPENSSL_X509} -noout -text \
+    execute ${OPENSSL_X509} -noout -text \
         -in "$REVOKING_CERT_FILE"
 
     echo "Certificate file: $REVOKING_CERT_FILE"
@@ -1694,7 +1723,7 @@ function cmd_revoke_cert {
     if [[ "$REVOKE_THIS_ONE" == "y" ]]; then
 
         # openssl ca -revoke /etc/ssl/newcerts/1013.pem #replacing the serial number
-        ${OPENSSL_CA} -revoke "$REVOKING_CERT_FILE"
+        execute ${OPENSSL_CA} -revoke "$REVOKING_CERT_FILE"
         RETSTS=$?
         if [[ ${RETSTS} -ne 0 ]]; then
             echo "Error $RETSTS during 'openssl ca'"
@@ -1728,7 +1757,7 @@ function cmd_verify_cert {
 
     # Visual Inspection:
     # check a certificate, its expiration date and who signed it
-    ${OPENSSL_X509} -noout -text -in "$CERT_CERT_PEM"
+    execute ${OPENSSL_X509} -noout -text -in "$CERT_CERT_PEM"
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
         echo "FAIL: Unable to view certificate: $CERT_CSR_PEM"
@@ -1740,7 +1769,7 @@ function cmd_verify_cert {
     echo "Certificate: $CERT_CERT_PEM"
 
     # Verify the key
-    ${OPENSSL_PKEY} -noout -in "$CERT_KEY_PEM" -check
+    execute ${OPENSSL_PKEY} -noout -in "$CERT_KEY_PEM" -check
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
         echo "Key $CERT_KEY_PEM: FAILED VERIFICATION"
@@ -1749,7 +1778,7 @@ function cmd_verify_cert {
     fi
 
     # Verify the CSR
-    ${OPENSSL_REQ} -noout -verify -in "$CERT_CSR_PEM"
+    execute ${OPENSSL_REQ} -noout -verify -in "$CERT_CSR_PEM"
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
         echo "CSR $CERT_CSR_PEM: FAILED VERIFICATION"
@@ -1758,7 +1787,7 @@ function cmd_verify_cert {
     fi
 
     # Verify the Certificate
-    ${OPENSSL_VERIFY} -no-CApath \
+    execute ${OPENSSL_VERIFY} -no-CApath \
         -CAfile "$PARENT_IA_CERT_PEM" "$CERT_CERT_PEM"
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
@@ -1813,13 +1842,13 @@ function cmd_verify_cert {
         if [ 0 -ne 0 ]; then
         # This is only valid with '--algorithm rsa' option
         # openssl v1.1.1 hasn't finished Digital decryptor/encryptor for ecdsa...
-        ${OPENSSL_X509} -in "$CERT_CERT_PEM" -noout -pubkey > "${TMP}/pubkey.pem"
+        execute ${OPENSSL_X509} -in "$CERT_CERT_PEM" -noout -pubkey > "${TMP}/pubkey.pem"
         dd if=/dev/urandom of="${TMP}/rnd" bs=32 count=1 status=none
-        ${OPENSSL_PKEYUTL} -sign \
+        execute ${OPENSSL_PKEYUTL} -sign \
             -inkey "$CERT_KEY_PEM" \
             -in "${TMP}/rnd" \
             -out "${TMP}/sig"
-        ${OPENSSL_PKEYUTL} -verifyrecover \
+        execute ${OPENSSL_PKEYUTL} -verifyrecover \
             -inkey "${TMP}/pubkey.pem" \
             -in "${TMP}/sig" \
             -out "${TMP}/check"
@@ -1909,7 +1938,7 @@ while true; do
         CIPHER=$1
         ;;
     -d|--dry-run)
-        DRY_RUN="echo"
+        DRY_RUN="execute"
         ;;
     -f|--force-delete)
         FORCE_DELETE_CONFIG=1
