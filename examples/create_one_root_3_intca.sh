@@ -5,68 +5,101 @@
 # Suitable for medium to large enterprise
 #
 
-OPTS="-v"
+assert_success() {
+  if [ $1 -ne 0 ]; then
+    echo "Failed: errno $1; aborted."
+    exit $1
+  fi
+}
+
+
+# OPTS="-v"
 
 TLS_CA_MANAGE="../tls-ca-manage.sh"
 TLS_CERT_MANAGE="../tls-cert-manage.sh"
 
-check_errno()
-{
-  local retsts
-  retsts=$?
-  if [ $retsts -ne 0 ]; then
-    echo "Error no. ${retsts}; aborted."
-    exit $retsts
-  fi
-}
-
 # Create Root CA
+echo "Creating AcmeRoot CA certificate ..."
 ${TLS_CA_MANAGE} $OPTS create -t root AcmeRoot
-check_errno
+assert_success $?
 
 #  Create intermediates CA
+echo "Creating AcmeNetwork intermediate CA certificate (AcmeRoot CA)..."
 ${TLS_CA_MANAGE} $OPTS create -p AcmeRoot -t intermediate AcmeNetwork
+assert_success $?
 
 #  Create signing CAs
+echo "Creating AcmeComponent intermediate CA certificate (AcmeNetwork intCA) ..."
 ${TLS_CA_MANAGE} $OPTS create -p AcmeNetwork -t intermediate AcmeComponent
-check_errno
+assert_success $?
+
+echo "Creating AcmeIdentity intermediate CA certificate (AcmeNetwork intCA) ..."
 ${TLS_CA_MANAGE} $OPTS create -p AcmeNetwork -t intermediate AcmeIdentity
-check_errno
+assert_success $?
+
+echo "Creating AcmeSecurity intermediate CA certificate (AcmeNetwork intCA) ..."
 ${TLS_CA_MANAGE} $OPTS create -p AcmeNetwork -t intermediate AcmeSecurity
-check_errno
+assert_success $?
+
+echo "Creating AcmeOther intermediate CA certificate (AcmeNetwork intCA) ..."
 ${TLS_CA_MANAGE} $OPTS create -p AcmeNetwork -t intermediate AcmeOther
-check_errno
+assert_success $?
+
 
 #  Create signing CAs under Component intermediate CA
+echo "Creating tls-secured-portals server certificate (AcmeComponent intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create tls-secured-portals server AcmeComponent
-check_errno
+assert_success $?
+
+echo "Creating AcmeOCSP ocsp certificate (AcmeComponent intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create AcmeOCSP ocsp AcmeComponent
-check_errno
+assert_success $?
+
+echo "Creating AcmeTimeStamping timestamping certificate (AcmeComponent intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create AcmeTimeStamping timestamping AcmeComponent
-check_errno
+assert_success $?
+
+echo "Creating tls-secured-login client certificate (AcmeComponent intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create tls-secured-login client AcmeComponent # TLS Client
-check_errno
+assert_success $?
+
+echo "Creating vpn-servers server certificate (AcmeComponent intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create vpn-servers server AcmeComponent
-check_errno
+assert_success $?
+
+echo "Creating vpn-servers client certificate (AcmeComponent intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create vpn-clients client AcmeComponent
-check_errno
+assert_success $?
+
 
 #  Create signing CAs under Identity intermediate CA
+echo "Creating user-mail-encryption email certificate (AcmeIdentity intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create user-mail-encryption email AcmeIdentity
-check_errno
+assert_success $?
+
 
 # https://blog.benjojo.co.uk/post/tls-https-server-from-a-yubikey
+echo "Creating secured-smartcardkeys smartcard certificate (AcmeIdentity intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create secured-smartcardkeys smartcard AcmeIdentity
-check_errno
+assert_success $?
 
+
+echo "Creating user-mail-identity identity certificate (AcmeSecurity intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create user-mail-identity identity AcmeIdentity
-check_errno
+assert_success $?
+
 
 #  Create signing CAs under Security intermediate CA
+echo "Creating building-cardreaders identity certificate (AcmeSecurity intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create building-cardreaders identity AcmeSecurity
-check_errno
+assert_success $?
+
+echo "Creating guardstations identity certificate (AcmeSecurity intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create guardstations identity AcmeSecurity
-check_errno
+assert_success $?
+
+echo "Creating control identity certificate (AcmeSecurity intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create control identity AcmeSecurity
-check_errno
+assert_success $?
+
 

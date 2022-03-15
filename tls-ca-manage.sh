@@ -5,6 +5,16 @@
 #     1.domainComponent       = "simple"
 #  to "[req_dn]" of "intermediate_ca.cnf"
 
+execute() {
+  if [[ "$VERBOSITY" -ge 1 || -n "$DRY_RUN" ]]; then
+    echo "COMMAND: $@"
+  fi
+  if [ -z "$DRY_RUN" ]; then
+    $@
+    return $?
+  fi
+}
+
 # NAME
 #     tls-ca-manage.sh - Manage Root and Intermediate Certificate Authorities
 #
@@ -1282,7 +1292,7 @@ function ca_create_public_key
     change_owner_perm "$SSL_USER_NAME" "$SSL_GROUP_NAME" 0640 "$IA_KEY_PEM"
 
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_GENPKEY} \
+    execute ${OPENSSL_GENPKEY} \
         ${OPENSSL_ALGORITHM} \
         -text \
         -outform PEM \
@@ -1306,10 +1316,10 @@ function ca_create_public_key
         # View the private key in readable format
 
         #shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_ASN1PARSE} -in "$IA_KEY_PEM"
+        execute ${OPENSSL_ASN1PARSE} -in "$IA_KEY_PEM"
 
         #shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_PKEY} \
+        execute ${OPENSSL_PKEY} \
             ${CIPHER_ARG_PASSIN} \
             -in "$IA_KEY_PEM" \
             -noout \
@@ -1447,7 +1457,7 @@ function ca_create_chain_certificate
 function ca_create_csr
 {
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_REQ} -new \
+    execute ${OPENSSL_REQ} -new \
         ${CIPHER_ARG_PASSIN} \
         -key "$IA_KEY_PEM" \
         "-$MESSAGE_DIGEST" \
@@ -1470,10 +1480,10 @@ function ca_create_csr
         # View the CSR in readable format
 
 	#shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_ASN1PARSE} -in "$IA_CSR_PEM"
+        execute ${OPENSSL_ASN1PARSE} -in "$IA_CSR_PEM"
 
 	#shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_REQ} "${CIPHER_ARG_PASSIN}" -in "$IA_CSR_PEM" -noout -text
+        execute ${OPENSSL_REQ} "${CIPHER_ARG_PASSIN}" -in "$IA_CSR_PEM" -noout -text
     fi
 }
 
@@ -1487,7 +1497,7 @@ function ca_create_certificate {
     IA_OPENSSL_CNF_EXTFILE="$1"
     IA_OPENSSL_CNF_EXTENSION="$2"
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_CA} \
+    execute ${OPENSSL_CA} \
         -batch \
         ${IA_OPENSSL_CA_OPT} \
         -extfile "${IA_OPENSSL_CNF_EXTFILE}" \
@@ -1516,7 +1526,7 @@ function ca_create_revocation_list
 {
     echo "Creating $PARENT_TYPE_STR certificate revocation list (CRL)..."
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_CA} \
+    execute ${OPENSSL_CA} \
         -gencrl \
         -config "$IA_OPENSSL_CNF" \
         ${CIPHER_ARG_PASSIN} \
@@ -1536,7 +1546,7 @@ function ca_extract_signing_request
     # We are at the mercy of CA_CERT_PEM being the latest
     # and ALSO in its index.txt file as well.
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_X509} -x509toreq \
+    execute ${OPENSSL_X509} -x509toreq \
         ${CIPHER_ARG_PASSIN} \
        -in "$IA_CERT_PEM" \
        -signkey "$IA_KEY_PEM" \
@@ -1552,9 +1562,9 @@ function ca_extract_signing_request
     fi
     if [[ ${VERBOSITY} -ne 0 ]]; then
 	#shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_ASN1PARSE} -in "$IA_CSR_PEM"
+        execute ${OPENSSL_ASN1PARSE} -in "$IA_CSR_PEM"
 	#shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_REQ} ${CIPHER_ARG_PASSIN} -in "$IA_CSR_PEM" -noout -text
+        execute ${OPENSSL_REQ} ${CIPHER_ARG_PASSIN} -in "$IA_CSR_PEM" -noout -text
     fi
 }
 
@@ -1568,7 +1578,7 @@ function ca_renew_certificate
     IA_OPENSSL_CNF_EXTENSION="$2"
     # DO NOT USE 'openssl x509', because lack of DB accounting
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_CA} \
+    execute ${OPENSSL_CA} \
         -verbose \
         ${IA_OPENSSL_CA_OPT} \
         -extfile "${IA_OPENSSL_CNF_EXTFILE}" \
@@ -1633,12 +1643,12 @@ function display_ca_certificate {
     echo "Displaying MD5 of various CA certificates:"
 
     #shellcheck disable=SC2086
-    echo "$(${DRY_RUN} ${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$THIS_PEM" | ${DRY_RUN} ${OPENSSL_MD5}) $THIS_PEM"
+    echo "$(${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$THIS_PEM" | ${OPENSSL_MD5}) $THIS_PEM"
 
     if [[ "$VERBOSITY" -ne 0 ]]; then
         echo "Decoding $PARENT_TYPE_STR certificate:"
 	#shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_X509} "${CIPHER_ARG_PASSIN}" -in "$THIS_PEM" -noout -text
+        execute ${OPENSSL_X509} "${CIPHER_ARG_PASSIN}" -in "$THIS_PEM" -noout -text
     else
         echo "To see decoded $PARENT_TYPE_STR certificate, execute:"
         echo "  $OPENSSL_X509 -in $THIS_PEM -noout -text"
@@ -1862,7 +1872,7 @@ function cmd_revoke_ca {
     # Extract serial ID from this .crt PEM file
 
     #shellcheck disable=SC2086
-    SERIAL_ID=$(${DRY_RUN} ${OPENSSL_X509} -noout -serial -in "${IA_CERT_PEM}" | awk -F= '{print $2}')
+    SERIAL_ID=$(${OPENSSL_X509} -noout -serial -in "${IA_CERT_PEM}" | awk -F= '{print $2}')
     echo "Extracted serial id $SERIAL_ID from that PEM file."
 
     REVOKING_CERT_FILE="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${SERIAL_ID}.pem"
@@ -1871,7 +1881,7 @@ function cmd_revoke_ca {
     # -keyfile and -cert are not needed if an openssl.cnf is proper
 
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_X509} -noout -text \
+    execute ${OPENSSL_X509} -noout -text \
         ${CIPHER_ARG_PASSIN} \
         -in "$REVOKING_CERT_FILE"
 
@@ -1881,7 +1891,7 @@ function cmd_revoke_ca {
 
         # openssl ca -revoke /etc/ssl/newcerts/1013.pem #replacing the serial number
 	#shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_CA} -revoke "$REVOKING_CERT_FILE"
+        execute ${OPENSSL_CA} -revoke "$REVOKING_CERT_FILE"
         RETSTS=$?
         if [[ ${RETSTS} -ne 0 ]]; then
             echo "Error $RETSTS during 'openssl ca' command"
@@ -1899,21 +1909,16 @@ function cmd_revoke_ca {
 function cmd_verify_ca {
     [[ ${VERBOSITY} -ne 0 ]] && echo "Verify certificate command..."
 
-# You can use OpenSSL to check the consistency of a private key:
-# openssl rsa -in [privatekey] -check
-
-# For my forged keys it will tell you:
-# RSA key error: n does not equal p q
-
-# You can then compare the public key, for example by calculating the so-called SPKI SHA256 hash:
-# openssl pkey -in [privatekey] -pubout -outform der | sha256sum
-# openssl x509 -in [certificate] -pubkey |openssl pkey -pubin -pubout -outform der | sha256sum
+    # Three step
+    #   extract hash from SSL certificate
+    #   extract hash from RSA private key
+    #   extract hash from CSR PEM
 
     # Visual Inspection:
     # check a certificate, its expiration date and who signed it
 
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_X509} -noout -text -in "$IA_CERT_PEM"
+    execute ${OPENSSL_X509} -noout -text -in "$IA_CERT_PEM"
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
         echo "FAIL: Unable to view certificate: $IA_CSR_PEM"
@@ -1921,36 +1926,132 @@ function cmd_verify_ca {
     fi
 
     echo "Key:         $IA_KEY_PEM"
-    echo "CSR:         $IA_KEY_PEM"
+    echo "CSR:         $IA_CSR_PEM"
     echo "Certificate: $IA_CERT_PEM"
 
-    # Verify the key
+    ########################################
+    # Read-ahead the three files
+    ########################################
 
+    # Reading the key
+    echo "Reading $IA_KEY_PEM key file ..."
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_PKEY} -noout ${CIPHER_ARG_PASSIN} -in "$IA_KEY_PEM" -check
+    execute ${OPENSSL_PKEY} \
+        -noout \
+        -in "$IA_KEY_PEM" \
+        -outform PEM \
+        ${CIPHER_ARG_PASSIN} \
+	-check
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
-        echo "Key $IA_KEY_PEM: FAILED VERIFICATION"
-    else
-        echo "Key $IA_KEY_PEM: verified"
+        echo "Key $IA_KEY_PEM: FAILED READING"
+	exit 15
     fi
 
-    # Verify the CSR
+    # Reading the CSR
 
+    echo "Reading $IA_CSR_PEM certificate request file ..."
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_REQ} -noout -verify -in "$IA_CSR_PEM"
+    execute ${OPENSSL_REQ} \
+        -noout \
+	-in "$IA_CSR_PEM" \
+        -outform PEM 
+        # -pubkey \
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
-        echo "CSR $IA_CSR_PEM: FAILED VERIFICATION"
-    else
-        echo "CSR $IA_CSR_PEM: verified"
+        echo "CSR $IA_CSR_PEM: FAILED READING"
+	exit 16
     fi
 
-    # Verify the Certificate
+    # Reading the Certificate (without CA path)
 
+    echo "Reading $IA_CERT_PEM certificate file ..."
     #shellcheck disable=SC2086
-    ${DRY_RUN} ${OPENSSL_VERIFY} -no-CApath \
-        -CAfile "$PARENT_IA_CERT_PEM" "$IA_CERT_PEM"
+    execute ${OPENSSL_X509} \
+	-in "$IA_CERT_PEM" \
+        -noout \
+	-outform PEM
+        # -pubkey \
+    RETSTS=$?
+    if [[ ${RETSTS} -ne 0 ]]; then
+        echo "CSR $IA_CERT_PEM: FAILED READING"
+	exit 17
+    fi
+
+    ##################################################
+    # Now compute hash of all three: KEY, CSR and CERT
+    ##################################################
+
+    hashkey="$(\
+        ${OPENSSL_PKEY} \
+	    -in "$IA_KEY_PEM" \
+            -pubout \
+	    -outform PEM \
+	    ${CIPHER_ARG_PASSIN} \
+	| ${OPENSSL_MD5} )"
+    hashcsr="$(\
+        ${OPENSSL_REQ} \
+            -in "$IA_CSR_PEM" \
+	    -pubkey \
+            -noout \
+	    -outform PEM \
+	    ${CIPHER_ARG_PASSIN} \
+        | ${OPENSSL_MD5} )"
+    hashcert="$(\
+        ${OPENSSL_X509} \
+	    -in "$IA_CERT_PEM" \
+	    -pubkey \
+            -noout \
+	    -outform PEM \
+        | ${OPENSSL_MD5})"
+    echo
+
+    echo "$hashkey:	$IA_KEY_PEM"
+    echo "$hashcsr:	$IA_CSR_PEM"
+    echo "$hashcert:	$IA_CERT_PEM"
+
+    ########################################
+    # Check if Key, Request, and Certificate matches
+    ########################################
+
+    if [[ -z "$hashkey" || -z "$hashcsr" || "$hashkey" != "$hashcsr" ]]; then
+      echo "Hash of Key and CSR do not match; aborted."
+      exit 21
+    fi
+    if [[ -z "$hashcsr" || -z "$hashcert" || "$hashcsr" != "$hashcert" ]]; then
+      echo "Hash of CSR and CERT do not match; aborted."
+      exit 21
+    fi
+    if [[ -z "$hashkey" || -z "$hashcert" || "$hashkey" != "$hashcert" ]]; then
+      echo "Hash of KEY and CERT do not match; aborted."
+      exit 21
+    fi
+    echo "All hashs of KEY, CSR, and CERT match each others."
+    echo
+
+    # Using OpenSSL verify
+
+    # exit early if this node type is typically a loner
+    # and would normally points to itself.
+    if [[ "$NODE_TYPE" == 'standalone' \
+           || "$NODE_TYPE" == 'root' ]]; then
+        echo "Node '${NODE_TYPE}' type normally points to itself:"
+        echo "    Skimping on CA-to-parent-CA integrity checking."
+        return
+    fi
+
+    # exit early if this node name is ITSELF
+    # which would normally be a 'self-referencing' node
+    if [ "$IA_NAME" == "$PARENT_IA_NAME" ]; then
+        echo "Parent '${PARENT_IA_NAME}' name is same as this node '${IA_NAME}' name:"
+        echo "    Skimping on CA-to-parent-CA integrity checking."
+        return
+    fi
+
+    echo "Cross-checking $IA_NAME with parent $PARENT_IA_NAME ..."
+    #shellcheck disable=SC2086
+    execute ${OPENSSL_VERIFY} \
+        -no-CApath -CAfile "$PARENT_IA_CERT_PEM" "$IA_CERT_PEM"
     RETSTS=$?
     if [[ ${RETSTS} -ne 0 ]]; then
         echo "Certificate $IA_CERT_PEM: FAILED VERIFICATION"
@@ -1961,41 +2062,36 @@ function cmd_verify_ca {
 
     TMP="$(mktemp -d)"
 
-    ########################################
-    # Check if Key and Certificate matches
-    ########################################
-
     # Checking MD5 hash
     #shellcheck disable=SC2086
-    hashkey="$(${DRY_RUN} ${OPENSSL_X509} -noout ${CIPHER_ARG_PASSIN} -in "$IA_CERT_PEM" | \
-              ${DRY_RUN} ${OPENSSL_MD5} )"
-    #shellcheck disable=SC2086
-    hashcrt="$(${DRY_RUN} ${OPENSSL_PKEY} -noout ${CIPHER_ARG_PASSIN} -in "$IA_KEY_PEM" | \
-              ${DRY_RUN} ${OPENSSL_MD5} )"
-    if [[ "${hashkey}" == "${hashcrt}" ]]; then
-        echo "MD5 hash matches"
-    else
-        echo "FAIL: MD5 hash does not match"
-        exit 1
-    fi
 
     # disabled until OpenSSL 3.0
+# You can use OpenSSL to check the consistency of a private key:
+# openssl rsa -in [privatekey] -check
+
+# For my forged keys it will tell you:
+# RSA key error: n does not equal p q
+
+# You can then compare the public key, for example by calculating the so-called SPKI SHA256 hash:
+# openssl pkey -in [privatekey] -pubout -outform der | sha256sum
+# openssl x509 -in [certificate] -pubkey |openssl pkey -pubin -pubout -outform der | sha256sum
+
     #shellcheck disable=SC2050
     if [ 0 -ne 0 ]; then
     # Checking SPKIsha256 hash
     #shellcheck disable=SC2086
-    hashkey="$(${DRY_RUN} ${OPENSSL_PKEY} \
+    hashkey="$(${OPENSSL_PKEY} \
         ${CIPHER_ARG_PASSIN} \
         -in "$IA_KEY_PEM" \
         -pubout \
         -outform der \
         | sha256sum)"
     #shellcheck disable=SC2086
-    hashcrt="$(${DRY_RUN} ${OPENSSL_X509} \
+    hashcrt="$(${OPENSSL_X509} \
         ${CIPHER_ARG_PASSIN} \
         -in "$IA_CERT_PEM" \
         -pubkey \
-        | ${DRY_RUN} ${OPENSSL_PKEY} \
+        | ${OPENSSL_PKEY} \
         -pubin \
         -pubout \
         -outform der \
@@ -2008,26 +2104,24 @@ function cmd_verify_ca {
     fi
     fi
 
-    if [[ "$NODE_TYPE" == "standalone" ]]; then
-        return
-    fi
-
 
     if [[ "$PEER_SIGNATURE" == "rsa" ]]; then
         # check test signature
         # This is only valid with '--algorithm rsa' option
         # openssl v1.1.1 hasn't finished Digital decryptor/encryptor for ecdsa...
 	#shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_X509} -in "$IA_CERT_PEM" -noout -pubkey > "${TMP}/pubkey.pem"
+        execute ${OPENSSL_X509} \
+            -in "$IA_CERT_PEM" \
+            -noout \
+	    -pubkey > "${TMP}/pubkey.pem"
         dd if=/dev/urandom of="${TMP}/rnd" bs=32 count=1 status=none
 	#shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_PKEYUTL} -sign \
+        execute ${OPENSSL_PKEYUTL} -sign \
             -inkey "$IA_KEY_PEM" \
             ${CIPHER_ARG_PASSIN} \
             -in "${TMP}/rnd" \
             -out "${TMP}/sig"
-	#shellcheck disable=SC2086
-        ${DRY_RUN} ${OPENSSL_PKEYUTL} -verifyrecover \
+        execute ${OPENSSL_PKEYUTL} -verifyrecover \
             -inkey "${TMP}/pubkey.pem" \
             "${CIPHER_ARG_PASSIN}" \
             -in "${TMP}/sig" \
@@ -2043,13 +2137,13 @@ function cmd_verify_ca {
 
         # Extract serial ID from .crt PEM file
 	#shellcheck disable=SC2086
-        SERIAL_ID="$(${DRY_RUN} ${OPENSSL_X509} -noout -serial ${CIPHER_ARG_PASSIN} -in "$IA_CERT_PEM" | awk -F= '{print $2}')"
+        SERIAL_ID="$(${OPENSSL_X509} -noout -serial ${CIPHER_ARG_PASSIN} -in "$IA_CERT_PEM" | awk -F= '{print $2}')"
         CA_NEWCERT_CURRENT_PEM="$PARENT_IA_NEWCERTS_ARCHIVE_DIR/${SERIAL_ID}.pem"
 
 	#shellcheck disable=SC2086
-        next_pem="$(${DRY_RUN} ${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$CA_NEWCERT_CURRENT_PEM" | ${DRY_RUN} ${OPENSSL_MD5})"
+        next_pem="$(${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$CA_NEWCERT_CURRENT_PEM" | ${OPENSSL_MD5})"
 	#shellcheck disable=SC2086
-        current_pem="$(${DRY_RUN} ${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$IA_CERT_PEM" | ${DRY_RUN} ${OPENSSL_MD5})"
+        current_pem="$( ${OPENSSL_X509} -noout -modulus ${CIPHER_ARG_PASSIN} -in "$IA_CERT_PEM" | ${OPENSSL_MD5})"
 
         if [[ "$next_pem" == "$current_pem" ]]; then
             echo "Archive matches"
@@ -2117,7 +2211,7 @@ while true; do
         CIPHER=$1
         ;;
     -d|--dry-run)
-        DRY_RUN="echo "
+        DRY_RUN=1
         ;;
     -f|--force-delete)
         FORCE_DELETE_CONFIG=1
@@ -2513,6 +2607,7 @@ IA_CA_SSLCFG="-config $PARENT_IA_OPENSSL_CNF"
 # Define all the OpenSSL commands
 OPENSSL_REQ="$OPENSSL req ${IA_REQ_SSLCFG}"
 [[ ${VERBOSITY} -ne 0 ]] && OPENSSL_REQ="$OPENSSL_REQ -verbose"
+OPENSSL_VERIFY="$OPENSSL verify"
 OPENSSL_X509="$OPENSSL x509"
 OPENSSL_MD5="$OPENSSL md5"
 OPENSSL_CA="$OPENSSL ca ${IA_CA_SSLCFG}"

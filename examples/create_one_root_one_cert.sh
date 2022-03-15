@@ -2,31 +2,36 @@
 #
 # Create One Root CA that can sign others
 #
+assert_success() {
+  if [ $1 -ne 0 ]; then
+    echo "Failed; aborted here."
+    exit $1
+  fi
+}
 echo "Demostrator for a single typical self-hosted server."
 echo
 TCAM="../tls-ca-manage.sh"
 TCEM="../tls-cert-manage.sh"
+
 #  Create a Root CA that can support intermediate CA(s)
-echo "Root CA started."
+echo "Creating Root CA certificate ..."
 ${TCAM} create -t root MyCaRoot
-retsts=$?
-echo "Root CA done: Exit errno $retsts"
+assert_success $?
 echo
-echo "PEM for Apache Webserver started."
+
+echo "Creating Apache Webserver certificate ..."
 ${TCEM} create apache-webserver   server MyCaRoot
-retsts=$?
-echo "PEM for Apache Webserver done: exit errno $retsts"
+assert_success $?
 echo
 
 echo "Verifying MyCaRoot PEM ..."
-${TCAM} -v verify root MyCaRoot
-retsts=$?
-echo "MyCaRoot PEM verified: exit errno $retsts"
+${TCAM} -v verify MyCaRoot
+assert_success $?
 echo
+
 echo "Verifying apache-webserver PEM ..."
 ${TCEM} -v verify  apache-webserver server MyCaRoot
-retsts=$?
-echo "apache-webserver PEM verified: exit errno $retsts"
+assert_success $?
 echo
 echo
 echo "Done."

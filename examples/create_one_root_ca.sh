@@ -2,49 +2,69 @@
 #
 # Create One Root CA that can sign others
 #
+
+assert_success() {
+  if [ $1 -ne 0 ]; then
+    echo "Failed; aborted here."
+    exit $1
+  fi
+}
+
+
 echo "Demostrator for a single typical self-hosted server."
 echo
 TCAM="../tls-ca-manage.sh"
 TCEM="../tls-cert-manage.sh"
+
 #  Create a Root CA that can support intermediate CA(s)
-echo "Root CA started."
+echo "Creating Root CA certificate ..."
 ${TCAM} create -t root MyCaRoot
-echo "Root CA done."
+assert_success $?
 echo
-echo "PEM for Apache Webserver started."
+
+echo "Creating Apache Webserver certificate ..."
 ${TCEM} create apache-webserver   server MyCaRoot
-echo "PEM for Apache Webserver done."
+assert_success $?
 echo
-echo "PEM for Postfix MTA server started."
+
+echo "Creating Postfix MTA server certificate ..."
 ${TCEM} create postfix-mtaserver  server MyCaRoot
-echo "PEM for Postfix MTA server done."
+assert_success $?
 echo
-echo "PEM for Dovecot IMAP server started."
+
+echo "Creating Dovecot IMAP server certificate ..."
 ${TCEM} create dovecot-imapserver server MyCaRoot
-echo "PEM for Dovecot IMAP server done."
+assert_success $?
 echo
-echo "PEM for IPSec server started."
+
+echo "Creating IPSec server certificate ..."
 ${TCEM} create ipsec-server       server MyCaRoot
-echo "PEM for IPSec server done."
+assert_success $?
 echo
-echo "PEM for Webmin Administrator started."
+
+echo "Creating Webmin Administrator certificate ..."
 ${TCEM} create webmin-server      server MyCaRoot
-echo "PEM for Webmin Administrator done."
+assert_success $?
 echo
 
 echo "Verifying apache-webserver PEM ..."
 ${TCEM} verify  apache-webserver server  MyCaRoot
-echo
+assert_success $?
+
 echo "Verifying postfix MTA server PEM ..."
 ${TCEM} verify  postfix-mtaserver server  MyCaRoot
-echo
+assert_success $?
+
 echo "Verifying dovecot IMAP server PEM ..."
 ${TCEM} verify  dovecot-imapserver server  MyCaRoot
-echo
+assert_success $?
+
 echo "Verifying IPSec server PEM ..."
 ${TCEM} verify  ipsec-server server  MyCaRoot
-echo
+assert_success $?
+
 echo "Verifying Webmin server PEM ..."
 ${TCEM} verify  webmin-server server  MyCaRoot
-echo
+assert_success $?
+
 echo "Done."
