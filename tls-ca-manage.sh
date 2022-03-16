@@ -1121,7 +1121,7 @@ prompt                  = no                    # Don't prompt for DN
 [ ${OCCC_CA_SECTION_LABEL}_dn ]
 countryName             = ${X509_COUNTRY}
 stateOrProvinceName     = ${X509_STATE}
-localityNamei           = ${X509_LOCALITY}
+localityName            = ${X509_LOCALITY}
 0.organizationName      = ${X509_ORG}
 
 # we can do this but it is not needed normally :-)
