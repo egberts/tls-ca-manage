@@ -676,14 +676,14 @@ crl_url                 = ${X509_CRL}     # CRL distribution point
 ocsp_url                = ${X509_URL_OCSP}
 
 [ req ]
+distinguished_name      = ${NODE_TYPE}_dn         # DN template
+req_extensions          = $CGCRCF_SECTION_NAME     # Desired extensions
 default_bits            = $KEYSIZE_BITS         # RSA key size
 encrypt_key             = yes                   # Protect private key
 default_md              = $MESSAGE_DIGEST       # MD to use
 utf8                    = yes                   # Input is UTF-8
 string_mask             = utf8only              # Emit UTF-8 strings
 prompt                  = yes                   # Prompt for DN
-distinguished_name      = ${NODE_TYPE}_dn         # DN template
-req_extensions          = $CGCRCF_SECTION_NAME     # Desired extensions
 
 # insert [ v3_ca ] here to compensate for macOS bastardizing OpenSSH
 
@@ -1787,6 +1787,8 @@ function cmd_verify_cert {
     fi
 
     # Verify the Certificate
+    # -no-CApath means do not look into /etc/ssl/certs directory, if any
+    # -no-CAfile means do not look into /usr/lib/ssl/cert.pem file, if any
     execute ${OPENSSL_VERIFY} -no-CApath \
         -CAfile "$PARENT_IA_CERT_PEM" "$CERT_CERT_PEM"
     RETSTS=$?

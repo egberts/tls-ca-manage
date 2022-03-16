@@ -58,7 +58,7 @@ execute() {
 #
 #    -h, --help
 #
-#    -i, --intermediate-node
+#    -i, --intermediate-node  [TODO]
 #        Makes this CA the intermediate node where additional CA(s)
 #        can be branched from this CA.  Root CA is also an intermediate
 #        node but top-level, self-signed intermediate node.
@@ -1119,32 +1119,17 @@ string_mask             = utf8only              # Emit UTF-8 strings
 prompt                  = no                    # Don't prompt for DN
 
 [ ${OCCC_CA_SECTION_LABEL}_dn ]
-countryName             = Country Name (2-letter code)
-countryName_default     = ${X509_COUNTRY}
-countryName_min         = 2
-countryName_max         = 2
-
-stateOrProvinceName     = State or Province Name (full name)
-stateOrProvinceName_default = ${X509_STATE}
-
-localityName            = Locality Name (eg, city)
-localityName_default    = ${X509_LOCALITY}
-
-0.organizationName      = Organization Name (eg. company)
-0.organizationName_default = ${X509_ORG}
+countryName             = ${X509_COUNTRY}
+stateOrProvinceName     = ${X509_STATE}
+localityNamei           = ${X509_LOCALITY}
+0.organizationName      = ${X509_ORG}
 
 # we can do this but it is not needed normally :-)
 #1.organizationName = World Wide Web Pty Ltd
 
-organizationalUnitName  = Organization Unit Name (eg. section/dept.)
-organizationalUnitName_default = ${X509_OU}
-
-commonName              = Common Name (e.g. server FQDN or YOUR name)
-commonName_default      = ${X509_COMMON}
-commonName_max          = 64
-
-emailAddress            = Email Address
-emailAddress_default    = ${X509_EMAIL}
+organizationalUnitName  = ${X509_OU}
+commonName              = ${X509_COMMON}
+emailAddressi           = ${X509_EMAIL}
 
 [ ${OCCC_CA_SECTION_LABEL}_reqext ]
 keyUsage                = ${CNF_REQ_EXT_KU}
@@ -1930,15 +1915,6 @@ function cmd_revoke_ca {
 function cmd_verify_ca {
     [[ ${VERBOSITY} -ne 0 ]] && echo "Verify certificate command..."
 
-    # defensive check
-    # OpenSSL checks for /usr/lib/ssl/cert.pem during 'openssl x509'
-    if [ -f "/usr/lib/ssl/cert.pem" ]; then
-      echo "FATAL: Ummmm, your binary OpenSSL is trying to look"
-      echo "at /usr/lib/ssl/cert.pem firstly before yours"
-      echo "Remove that file before re-running."
-      exit 255
-    fi
-
     # Three step
     #   extract hash from SSL certificate
     #   extract hash from RSA private key
@@ -2079,6 +2055,9 @@ function cmd_verify_ca {
     fi
 
     echo "Cross-checking $IA_NAME with parent $PARENT_IA_NAME ..."
+    # -no-CApath means do not look into /etc/ssl/certs directory, if any
+    # -no-CAfile means do not look into /usr/lib/ssl/cert.pem file, if any
+
     #shellcheck disable=SC2086
     execute ${OPENSSL_VERIFY} \
         -no-CApath -CAfile "$PARENT_IA_CERT_PEM" "$IA_CERT_PEM"
