@@ -10,11 +10,13 @@ assert_success() {
   fi
 }
 
+OPTS="-v"
+
 
 echo "Demostrator for a single typical self-hosted server."
 echo
-TCAM="../tls-ca-manage.sh"
-TCEM="../tls-cert-manage.sh"
+TCAM="../tls-ca-manage.sh $OPTS"
+TCEM="../tls-cert-manage.sh $OPTS"
 
 #  Create a Root CA that can support intermediate CA(s)
 echo "Creating Root CA certificate ..."
