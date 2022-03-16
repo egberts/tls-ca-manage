@@ -1129,7 +1129,7 @@ localityNamei           = ${X509_LOCALITY}
 
 organizationalUnitName  = ${X509_OU}
 commonName              = ${X509_COMMON}
-emailAddressi           = ${X509_EMAIL}
+emailAddress            = ${X509_EMAIL}
 
 [ ${OCCC_CA_SECTION_LABEL}_reqext ]
 keyUsage                = ${CNF_REQ_EXT_KU}
@@ -1140,13 +1140,20 @@ subjectKeyIdentifier    = ${CNF_REQ_EXT_SKI}
 
 ############################################################
 # CA operational settings
-############################################################
-
+#
 # signs the CSR and create certificate authority 
 # certificate request via 'openssl ca ...' command
+############################################################
+
 [ ca ]
 default_ca              = ${OCCC_CA_SECTION_LABEL}_ca  # The default CA section
 
+
+# The ${OCCC_CA_NAME} CA section (Node Type: ${OCCC_NODE_TYPE})
+# You can remove this section from the [ ca ] if you are merging
+# a bunch of CA sections together and select this by executing:
+#    openssl ca -name ${OCCC_CA_NAME}
+#
 [ ${OCCC_CA_SECTION_LABEL}_ca ]
 certificate             = ${IA_CERT_PEM}        # The CA cert
 private_key             = ${IA_KEY_PEM}         # CA private key
@@ -1167,6 +1174,13 @@ copy_extensions         = none                  # Copy extensions from CSR
 default_crl_days        = 30                    # How long before next CRL
 crl_extensions          = crl_ext               # CRL extensions
 
+# The policy section, which specifies how closely the 
+# Distinguished Name in a certificate presented to SSL 
+# software must agree with the Distinguished Name in 
+# an installed certificate, for the two certificates to 
+# be considered to match. 
+# For 'match_pol', only Country and Organization must match
+
 [ match_pol ]
 countryName             = match
 stateOrProvinceName     = optional
@@ -1174,6 +1188,9 @@ localityName            = optional
 organizationName        = match
 organizationalUnitName  = optional
 commonName              = supplied
+
+
+# For 'any_pol', nothing must match
 
 [ any_pol ]
 domainComponent         = optional
@@ -1666,12 +1683,12 @@ function delete_any_old_ca_files {
     # Yeah, yeah, yeah; destructive but this is a new infrastructure
     if [[ -d "$IA_DIR" ]]; then
         echo "WHOA! Directory $IA_DIR already exist."
-        read -rp "Do you want to do mass-precision-delete of $IA_DIR? (N/yes): " \
+        read -rp "Delete the content of $IA_DIR? (N/yes): " \
 		-eiN DELETE_IA_DIR
 	echo
         if [[ "$DELETE_IA_DIR" =~ y|yes|Y|YES ]]; then
             echo "You probably may lose intermediate and client certificates."
-            read -rp "Do you want to do mass-precision-delete of $IA_DIR? (N/yes): " \
+            read -rp "Delete the content of $IA_DIR? (N/yes): " \
 		    -eiN DELETE_IA_DIR
 	    echo
             if [[ "$DELETE_IA_DIR" =~ y|yes|Y|YES ]]; then
@@ -2170,6 +2187,15 @@ function cmd_verify_ca {
 ##########################################################################
 # MAIN SCRIPT begins
 ##########################################################################
+
+# disables some Environment Variables as OpenSSL does attempt to
+# reference them before reviewing our openssl.cnf files.
+#
+OPENSSL_CONFIG=
+OPENSSL_CONF=
+OPENSSL_DIR=
+OPENSSL_BIN=
+OPENSSL=
 
 # Call getopt to validate the provided input.
 options=$(getopt -o a:b:c:dfg:hik:m:np:s:t:Tv -l algorithm:,base-dir:,cipher:,dry-run,force-delete,group:,help,intermediate-node,keysize:,message-digest:,nested-ca,parent-ca:,serial:,ca-type:,traditional,verbose -- "$@")
