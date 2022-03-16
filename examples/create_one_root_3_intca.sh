@@ -13,7 +13,7 @@ assert_success() {
 }
 
 
-# OPTS="-v"
+OPTS="-v"
 
 TLS_CA_MANAGE="../tls-ca-manage.sh"
 TLS_CERT_MANAGE="../tls-cert-manage.sh"
