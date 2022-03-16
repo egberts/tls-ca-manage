@@ -1107,39 +1107,60 @@ ocsp_url                = ${X509_URL_BASE}/ocsp
 
 # CA certificate request via 'openssl req ...' command
 [ req ]
+distinguished_name      = ${OCCC_CA_SECTION_LABEL}_dn      # DN section
+req_extensions          = ${OCCC_CA_SECTION_LABEL}_reqext  # Desired extensions
 default_bits            = ${KEYSIZE_BITS}       # RSA key size
 encrypt_key             = yes                   # Protect private key
 default_md              = ${MESSAGE_DIGEST}     # MD to use
 utf8                    = yes                   # Input is UTF-8
 string_mask             = utf8only              # Emit UTF-8 strings
+
 # if promt is 'yes', then [ ca_dn ] needs changing
 prompt                  = no                    # Don't prompt for DN
-distinguished_name      = ${OCCC_CA_SECTION_LABEL}_dn                 # DN section
-req_extensions          = ${OCCC_CA_SECTION_LABEL}_reqext             # Desired extensions
 
 [ ${OCCC_CA_SECTION_LABEL}_dn ]
-countryName             = ${X509_COUNTRY}
-stateOrProvinceName     = ${X509_STATE}
-localityName            = ${X509_LOCALITY}
-0.organizationName      = ${X509_ORG}
+countryName             = Country Name (2-letter code)
+countryName_default     = ${X509_COUNTRY}
+countryName_min         = 2
+countryName_max         = 2
+
+stateOrProvinceName     = State or Province Name (full name)
+stateOrProvinceName_default = ${X509_STATE}
+
+localityName            = Locality Name (eg, city)
+localityName_default    = ${X509_LOCALITY}
+
+0.organizationName      = Organization Name (eg. company)
+0.organizationName_default = ${X509_ORG}
 
 # we can do this but it is not needed normally :-)
 #1.organizationName = World Wide Web Pty Ltd
 
-organizationalUnitName  = ${X509_OU}
-commonName              = ${X509_COMMON}
-emailAddress            = ${X509_EMAIL}
+organizationalUnitName  = Organization Unit Name (eg. section/dept.)
+organizationalUnitName_default = ${X509_OU}
+
+commonName              = Common Name (e.g. server FQDN or YOUR name)
+commonName_default      = ${X509_COMMON}
+commonName_max          = 64
+
+emailAddress            = Email Address
+emailAddress_default    = ${X509_EMAIL}
 
 [ ${OCCC_CA_SECTION_LABEL}_reqext ]
 keyUsage                = ${CNF_REQ_EXT_KU}
 basicConstraints        = ${CNF_REQ_EXT_BC}
 subjectKeyIdentifier    = ${CNF_REQ_EXT_SKI}
 
-# CA operational settings
+# There is no v3_req section here, this is a CA, not an end-use cert
 
-# signs the CSR and create certificate authority certificate request via 'openssl ca ...' command
+############################################################
+# CA operational settings
+############################################################
+
+# signs the CSR and create certificate authority 
+# certificate request via 'openssl ca ...' command
 [ ca ]
-default_ca              = ${OCCC_CA_SECTION_LABEL}_ca               # The default CA section
+default_ca              = ${OCCC_CA_SECTION_LABEL}_ca  # The default CA section
 
 [ ${OCCC_CA_SECTION_LABEL}_ca ]
 certificate             = ${IA_CERT_PEM}        # The CA cert
@@ -1908,6 +1929,15 @@ function cmd_revoke_ca {
 ##################################################
 function cmd_verify_ca {
     [[ ${VERBOSITY} -ne 0 ]] && echo "Verify certificate command..."
+
+    # defensive check
+    # OpenSSL checks for /usr/lib/ssl/cert.pem during 'openssl x509'
+    if [ -f "/usr/lib/ssl/cert.pem" ]; then
+      echo "FATAL: Ummmm, your binary OpenSSL is trying to look"
+      echo "at /usr/lib/ssl/cert.pem firstly before yours"
+      echo "Remove that file before re-running."
+      exit 255
+    fi
 
     # Three step
     #   extract hash from SSL certificate
