@@ -1075,7 +1075,7 @@ function write_line_or_no
 }
 
 # Creates an extension file that details the
-# relatioship between parent CA and its child CA
+# relationship between parent CA and its child CA
 #
 # Usage: create_internode_config <section_name> \
 #                                <internode_filespec> \
