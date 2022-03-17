@@ -1,0 +1,131 @@
+# OpenSSL Intermediary CA configuration file
+# 
+# Used only during 'openssl req' during OCSP server request
+
+[ ca ]
+default_ca = int_ca
+
+[ int_ca ]
+# Directory and file locations.
+dir               = .
+# certs             = $dir/certs
+# crl_dir           = $dir/crl
+# new_certs_dir     = $dir/certs
+# database          = $dir/index.txt
+# serial            = $dir/serial
+# RANDFILE          = $dir/private/.rand
+certs             = $dir
+crl_dir           = $dir
+new_certs_dir     = $dir
+database          = $dir/index.txt
+serial            = $dir/serial
+RANDFILE          =
+
+# The root key and root certificate.
+private_key       = ./intCA.cheese.key.pem
+certificate       = ./intCA.cheese.crt.pem
+
+# For certificate revocation lists.
+crlnumber         = $dir/crlnumber
+crl               = $dir/whomovedmycheese.crl
+crl_extensions    = crl_ext
+default_crl_days  = 180
+
+# SHA-1 is deprecated, so use SHA-2 or SHA-3 instead.
+default_md        = sha384
+
+name_opt          = ca_default
+cert_opt          = ca_default
+default_days      = 3000
+preserve          = no
+policy            = policy_loose
+
+[ policy_loose ]
+# Allow the intermediate CA to sign a more diverse range of certificates.
+# See the POLICY FORMAT section of the `ca` man page.
+countryName             = optional
+stateOrProvinceName     = optional
+localityName            = optional
+organizationName        = optional
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+
+# [ 'req' ] is used only during REQuest of end-certs against this intermediate CA
+[ req ]
+# Options for the `req` tool (`man req`).
+distinguished_name  = intermediate_ca_req_distinguished_name
+req_extensions      = intCA_reqext
+default_bits        = 2048
+string_mask         = utf8only
+
+# SHA-1 is deprecated, so use SHA-2 or SHA-3 instead.
+default_md          = sha384
+
+# Extension to add when the -x509 option is used.
+x509_extensions     = v3_intermediate_ca
+
+
+[ intermediate_ca_req_distinguished_name ]
+countryName                     = Country Name (2 letter code)
+stateOrProvinceName             = State or Province Name
+localityName                    = Locality Name
+0.organizationName              = Organization Name
+organizationalUnitName          = Organizational Unit Name
+commonName                      = Common Name
+emailAddress                    = Email Address
+
+# Optionally, specify some defaults.
+countryName_default             = US
+stateOrProvinceName_default     = WA
+localityName_default            = Seattle
+0.organizationName_default      = Grilled Cheese Inc.
+organizationalUnitName_default  = Grilled Cheese Intermediary CA
+emailAddress_default            = grilledcheese@yummyinmytummy.us
+
+[ intCA_reqext ]
+keyUsage = critical, keyCertSign, cRLSign
+basicConstraints = critical, CA:true
+subjectKeyIdentifier = hash
+
+[ v3_intermediate_ca ]
+# Extensions for a typical intermediate CA (`man x509v3_config`).
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true, pathlen:0
+# need to add 'digitalSignature' for OCSP server? (only added before signing, not during req)
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+crlDistributionPoints = @crl_info
+authorityInfoAccess = @ocsp_info
+
+# 'oscp_server_req' get evoked during 'openssl req' for OCSP server cert
+[ oscp_server_req ]
+# Extensions for server certificates (`man x509v3_config`).
+basicConstraints = CA:FALSE
+nsCertType = server
+nsComment = "Grilled Cheese Generated Server Certificate"
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer:always
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+crlDistributionPoints = @crl_info
+authorityInfoAccess = @ocsp_info
+
+[ crl_ext ]
+# Extension for CRLs (`man x509v3_config`).
+authorityKeyIdentifier=keyid:always
+
+# 'ocsp' get evoked during 'openssl ca' for OCSP server cert
+[ ocsp_ext ]
+# Extension for OCSP signing certificates (`man ocsp`).
+basicConstraints = CA:FALSE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+keyUsage = critical, digitalSignature
+extendedKeyUsage = critical, OCSPSigning
+
+[crl_info]
+URI.0 = http://crl.grilledcheese.us/whomovedmycheese.crl
+
+[ocsp_info]
+caIssuers;URI.0 = http://ocsp.grilledcheese.us/cheddarcheeseroot.crt
+OCSP;URI.0 = http://ocsp.grilledcheese.us/
