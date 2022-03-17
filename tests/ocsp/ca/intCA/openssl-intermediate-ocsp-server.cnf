@@ -1,53 +1,37 @@
-# OpenSSL Root CA configuration file
-# Copy to /root/ca/openssl_root.cnf
+# OpenSSL Intermediary CA configuration file
+# Copy to /root/ca/intermediate/openssl_intermediate.cnf
 
 [ ca ]
 default_ca = CA_default
 
 [ CA_default ]
 # Directory and file locations.
-dir               = .
-# certs             = $dir/certs
-# crl_dir           = $dir/crl
-# new_certs_dir     = $dir/certs
-# database          = $dir/index.txt
-# serial            = $dir/serial
-# RANDFILE          = $dir/private/.rand
-certs             = $dir
-crl_dir           = $dir
-new_certs_dir     = $dir
+dir               = /root/ca/intermediate
+certs             = $dir/certs
+crl_dir           = $dir/crl
+new_certs_dir     = $dir/certs
 database          = $dir/index.txt
 serial            = $dir/serial
-RANDFILE          = 
+RANDFILE          = $dir/private/.rand
 
 # The root key and root certificate.
-private_key       = $dir/ca.cheese.key.pem
-certificate       = $dir/ca.cheese.crt.pem
+private_key       = $dir/private/int.cheese.key.pem
+certificate       = $dir/certs/int.cheese.crt.pem
 
 # For certificate revocation lists.
 crlnumber         = $dir/crlnumber
-crl               = $dir/intermediate.crl.pem
+crl               = $dir/crl/whomovedmycheese.crl
 crl_extensions    = crl_ext
-default_crl_days  = 360
+default_crl_days  = 180
 
 # SHA-1 is deprecated, so use SHA-2 or SHA-3 instead.
 default_md        = sha384
 
 name_opt          = ca_default
 cert_opt          = ca_default
-default_days      = 3650
+default_days      = 3000
 preserve          = no
-policy            = policy_strict
-
-[ policy_strict ]
-# The root CA should only sign intermediate certificates that match.
-# See the POLICY FORMAT section of `man ca`.
-countryName             = match
-stateOrProvinceName     = match
-organizationName        = match
-organizationalUnitName  = optional
-commonName              = supplied
-emailAddress            = optional
+policy            = policy_loose
 
 [ policy_loose ]
 # Allow the intermediate CA to sign a more diverse range of certificates.
@@ -60,6 +44,7 @@ organizationalUnitName  = optional
 commonName              = supplied
 emailAddress            = optional
 
+
 [ req ]
 # Options for the `req` tool (`man req`).
 default_bits        = 2048
@@ -67,9 +52,8 @@ distinguished_name  = req_distinguished_name
 string_mask         = utf8only
 
 # SHA-1 is deprecated, so use SHA-2 or SHA-3 instead.
-default_md          = sha256
+default_md          = sha384
 
-# Extension to add when the -x509 option is used.
 x509_extensions     = v3_ca
 
 [ req_distinguished_name ]
@@ -86,36 +70,11 @@ countryName_default             = US
 stateOrProvinceName_default     = WA
 localityName_default            = Seattle
 0.organizationName_default      = Grilled Cheese Inc.
-organizationalUnitName_default  = Grilled Cheese Root CA
+organizationalUnitName_default  = Grilled Cheese Intermediary CA
 emailAddress_default            = grilledcheese@yummyinmytummy.us
 
-[ v3_ca ]
-# Extensions for a typical CA (`man x509v3_config`).
-subjectKeyIdentifier = hash
-authorityKeyIdentifier = keyid:always,issuer
-basicConstraints = critical, CA:true
-keyUsage = critical, digitalSignature, cRLSign, keyCertSign
-
-[ v3_intermediate_ca ]
-# Extensions for a typical intermediate CA (`man x509v3_config`).
-subjectKeyIdentifier = hash
-authorityKeyIdentifier = keyid:always,issuer
-basicConstraints = critical, CA:true, pathlen:0
-keyUsage = critical, digitalSignature, cRLSign, keyCertSign
-crlDistributionPoints = @crl_info
-authorityInfoAccess = @ocsp_info
-
-[ usr_cert ]
-# Extensions for client certificates (`man x509v3_config`).
-basicConstraints = CA:FALSE
-nsCertType = client, email
-nsComment = "OpenSSL Generated Client Certificate"
-subjectKeyIdentifier = hash
-authorityKeyIdentifier = keyid,issuer
-keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
-extendedKeyUsage = clientAuth, emailProtection
-
-[ server_cert ]
+# Section 'ocsp_server_req' only during 'openssl req' for OCSP TLS Server PKI certs
+[ ocsp_server_req ]
 # Extensions for server certificates (`man x509v3_config`).
 basicConstraints = CA:FALSE
 nsCertType = server
@@ -126,14 +85,13 @@ keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth
 crlDistributionPoints = @crl_info
 authorityInfoAccess = @ocsp_info
-subjectAltName = @alt_names
 
-[alt_names]
-DNS.0 = CN Name Here
-
-[ crl_ext ]
-# Extension for CRLs (`man x509v3_config`).
-authorityKeyIdentifier=keyid:always
+[ v3_ca ]
+# Extensions for a typical CA (`man x509v3_config`).
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
 
 [ ocsp ]
 # Extension for OCSP signing certificates (`man ocsp`).
@@ -143,9 +101,17 @@ authorityKeyIdentifier = keyid,issuer
 keyUsage = critical, digitalSignature
 extendedKeyUsage = critical, OCSPSigning
 
+# [crl_info] could not stay out of openssl-ocsp.cnf
+# [ocsp_info] could not stay out of openssl-ocsp.cnf
+#
+[ crl_ext ]
+# Extension for CRLs (`man x509v3_config`).
+authorityKeyIdentifier=keyid:always
+
 [crl_info]
 URI.0 = http://crl.grilledcheese.us/whomovedmycheese.crl
 
 [ocsp_info]
 caIssuers;URI.0 = http://ocsp.grilledcheese.us/cheddarcheeseroot.crt
 OCSP;URI.0 = http://ocsp.grilledcheese.us/
+
