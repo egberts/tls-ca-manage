@@ -150,6 +150,7 @@ execute() {
   fi
 }
 
+
 function cmd_show_syntax_usage {
   cat << SYNTAX_EOF | more
  Usage:
@@ -218,9 +219,11 @@ DEFAULT_OFSTD_LAYOUT="centralized"
 DEFAULT_OFSTD_DIR_TREE_TYPE="flat"
 
 DEF_DOMAIN="example.invalid"
+
+# if the X509 is blank, use 'none'
 DEFAULT_CA_X509_COUNTRY="US"
-DEFAULT_CA_X509_STATE=""
-DEFAULT_CA_X509_LOCALITY=""
+DEFAULT_CA_X509_STATE="none"
+DEFAULT_CA_X509_LOCALITY="none"
 DEFAULT_CA_X509_COMMON="ACME Internal Root CA A1"
 DEFAULT_CA_X509_ORG="ACME Networks"
 DEFAULT_CA_X509_OU="Trust Division"
@@ -230,9 +233,10 @@ DEFAULT_CA_X509_CRL="http://${DEF_DOMAIN}/ca/example-crl.$DEFAULT_FILETYPE_CERT"
 # DEFAULT_CA_X509_URL_BASE="http://${DEF_DOMAIN}/ca"
 # DEFAULT_CA_X509_URL_OCSP="http://ocsp.${DEF_DOMAIN}:9080"
 
+# if the X509 is blank, use 'none'
 # DEFAULT_INTCA_X509_COUNTRY="US"
-# DEFAULT_INTCA_X509_STATE=""
-# DEFAULT_INTCA_X509_LOCALITY=""
+# DEFAULT_INTCA_X509_STATE="none"
+# DEFAULT_INTCA_X509_LOCALITY="none"
 # DEFAULT_INTCA_X509_COMMON="ACME Internal Intermediate CA B2"
 # DEFAULT_INTCA_X509_ORG="ACME Networks"
 # DEFAULT_INTCA_X509_OU="Semi-Trust Department"
@@ -248,7 +252,11 @@ function input_data {
   echo -n "$ID_PROMPT (default: '$ID_DEFAULT_VALUE'): "
   read -r ID_INPUT_DATA
   if [[ -z "$ID_INPUT_DATA" ]]; then
-    ID_INPUT_DATA="$ID_DEFAULT_VALUE"
+    if [ -z "$ID_DEFAULT_VALUE" ]; then
+      ID_INPUT_DATA='none'
+    else
+      ID_INPUT_DATA="$ID_DEFAULT_VALUE"
+    fi
   fi
   unset ID_PROMPT
   unset ID_DEFAULT_VALUE
@@ -683,58 +691,80 @@ encrypt_key             = yes                   # Protect private key
 default_md              = $MESSAGE_DIGEST       # MD to use
 utf8                    = yes                   # Input is UTF-8
 string_mask             = utf8only              # Emit UTF-8 strings
-prompt                  = yes                   # Prompt for DN
+
+# if you flip this 'prompt' value, you must intensively change *_dn 
+prompt                  = no                    # Prompt for DN
 
 # insert [ v3_ca ] here to compensate for macOS bastardizing OpenSSH
 
 [ ${NODE_TYPE}_dn ]
-countryName               = Country Name (2-letter code)
-countryName_default       = $X509_COUNTRY
-countryName_min           = 2
-countryName_max           = 2
+countryName                 = $X509_COUNTRY
+# countryName               = Country Name (2-letter code)
+# countryName_default       = $X509_COUNTRY
+# countryName_min           = 2
+# countryName_max           = 2
 
-stateOrProvinceName             = State or Province Name (full name)
-stateOrProvinceName_default     = $X509_STATE
+stateOrProvinceName             = $X509_STATE
+# stateOrProvinceName             = State or Province Name (full name)
+# stateOrProvinceName_default     = $X509_STATE
 
-localityName                    = Locality Name (eg, city)
-localityName_default            = $X509_LOCALITY
+localityName                    = $X509_LOCALITY
+# localityName                    = Locality Name (eg, city)
+# localityName_default            = $X509_LOCALITY
 
-0.organizationName              = Organization Name (eg, company)
-0.organizationName_default      = $X509_ORG
-# we can do this but it is not needed normally :-)
-#1.organizationName             = Second Organization Name (eg, company)
-#1.organizationName_default     = World Wide Web Pty Ltd
+0.organizationName              = $X509_ORG
+# 0.organizationName              = Organization Name (eg, company)
+# 0.organizationName_default      = $X509_ORG
 
-organizationalUnitName          = Organizational Unit Name (eg, section)
-organizationalUnitName_default = $X509_OU
+organizationalUnitName         = $X509_OU
+# organizationalUnitName          = Organizational Unit Name (eg, section)
+# organizationalUnitName_default = $X509_OU
 
-commonName                      = Common Name (e.g. server FQDN or YOUR name)
-commonName_default              = $X509_COMMON
-commonName_max                  = 64
+commonName                      = $X509_COMMON
+# commonName                      = Common Name (e.g. server FQDN or YOUR name)
+# commonName_default              = $X509_COMMON
+# commonName_max                  = 64
 
-emailAddress                    = Email Address
-emailAddress_default            = $X509_EMAIL
-emailAddress_max                = 64
+emailAddress                    = $X509_EMAIL
+# emailAddress                    = Email Address
+# emailAddress_default            = $X509_EMAIL
+# emailAddress_max                = 64
+
 CERT_REQ_EOF
 
-#  # Break apart domain name into domain labels
-#  X509_COMMON_LIST="$(cat "$X509_COMMON" | sed 's/\./ /g')"
-#
-#  # Adjust for 0-based indices
-#  X509_COMMON_COUNT="$(cat "$X509_COMMON_LIST" | wc -w)"
-#  ((X509_COMMON_COUNT--))
-#
-#  if [ $X509_COMMON_COUNT -ge 0 ]; then
-#    # Reverse the domain labels
-#    X509_COMMON_REVLIST="$(echo "$X509_COMMON_LIST" | awk '{ for (i=NF; i>1; i--) printf("%s ",$i); print $1; }')"
-#
-#    idx=0
-#    for domain_label in $X509_COMMON_REVLIST; do
-#      echo "${idx}.domainComponent = \"${domain_label}\"" >> "$CGCRCF_CNFFILE"
-#      ((idx++))
-#    done
-#  fi
+  # so far, 'server' appears to be the only SAN
+  if [ "$NODE_TYPE" == 'server' ]; then
 
+    #
+    # Break apart domain name into domain labels
+    X509_COMMON_LIST="$(cat "$X509_COMMON" | sed 's/\./ /g')"
+
+    # Adjust for 0-based indices
+    X509_COMMON_COUNT="$(cat "$X509_COMMON_LIST" | wc -w)"
+
+    if [ "$X509_COMMON_COUNT" -lt 2 ]; then
+      echo
+      echo "WARNING: Your data-entry of commonName did not appear "
+      echo "to be a fully-qualified domain name."
+      echo "I could not count beyond 1 dots."
+      echo "Ignoring..."
+      echo
+    fi
+    ((X509_COMMON_COUNT--))
+
+    if [ $X509_COMMON_COUNT -ge 0 ]; then
+      # Reverse the domain labels
+      X509_COMMON_REVLIST="$(echo "$X509_COMMON_LIST" | awk '{ for (i=NF; i>1; i--) printf("%s ",$i); print $1; }')"
+
+      idx=0
+      for domain_label in $X509_COMMON_REVLIST; do
+        echo "${idx}.domainComponent = \"${domain_label}\"" >> "$CGCRCF_CNFFILE"
+        ((idx++))
+      done
+    fi
+  fi
+
+  if [ 0 -ne 0 ]; then
   cat << CERT_REQ_EOF | tee -a "$CGCRCF_CNFFILE" >/dev/null
 # domainComponent is not used by 'identity.conf'
 0.domainComponent               = Top-level Domain Name (i.e., com, net, org)
@@ -744,7 +774,11 @@ CERT_REQ_EOF
 2.domainComponent               = Sub-Domain Name (i.e., www, ocsp, or 'blank')
 2.domainComponent_default       = 
 
+CERT_REQ_EOF
+  fi  #  [ 0 -ne 0 ]
 
+
+  cat << CERT_REQ_EOF | tee -a "$CGCRCF_CNFFILE" >/dev/null
 [ $CGCRCF_SECTION_NAME ]
 CERT_REQ_EOF
   write_line_or_no "keyUsage"               "$CNF_REQ_EXT_KU" "$CGCRCF_CNFFILE"
@@ -1107,6 +1141,35 @@ function delete_any_old_cert_files {
 }
 
 
+display_existing_cert() {
+  if [ -r "$1" ]; then
+    echo
+    echo "Current details of \"${CERT_NAME}\" $CERT_NODE_TYPE certificate:"
+    ${DRY_RUN} ${OPENSSL_X509} -noout \
+      -in "$1" \
+      -serial \
+      -subject \
+      -email \
+      -issuer \
+      -dates
+    read -rp "Want to display the X509 purpose of this cert? (N/y): " -eiN
+    REPLY="${REPLY:0:1}"  # first char only
+    REPLY="${REPLY,}"  # to lowercase
+    if [ "$REPLY" == 'y' ]; then
+      ${DRY_RUN} ${OPENSSL_X509} -noout \
+          -in "$CERT_CERT_PEM" \
+	  -purpose
+    fi
+  else
+    if [ -f "$1" ]; then
+      echo "File $1 is not readable; unable to display prior cert details"
+    else
+      echo "File $1 does not exist; unable to display prior cert details"
+    fi
+  fi
+}
+
+
 ##################################################
 # CLI create command                             #
 ##################################################
@@ -1131,9 +1194,39 @@ function cmd_create_cert {
 
     activate_subjectAltNames=0
     # Capture data entry for distinguished name
-    if [[ ! -f "$CERT_OPENSSL_CNF_REQ_FILE" ]]; then
 
-        # Create a new OpenSSL
+    # what to do with prior/existing configuration files?
+    if [[ -f "$CERT_OPENSSL_CNF_REQ_FILE" ]]; then
+
+      # config file exists, it depends
+      if [ "$CMD_MODE" == 'renew' ]; then
+        # Keep the related config files
+        CONF_REQ_FILE_REUSE=1
+      elif [ "$CMD_MODE" == 'create' ]; then
+        # Ummmm, we gotta ask but default is YES
+        echo
+        echo "File: $CERT_OPENSSL_CNF_REQ_FILE exists"
+	echo
+	display_existing_cert "$CERT_CERT_PEM"
+
+        read -rp "Reuse this file? (Y/n): " -eiY
+        REPLY="${REPLY:0:1}"
+        REPLY="${REPLY,}"
+        if [ "$REPLY" == 'y' ]; then
+          CONF_REQ_FILE_REUSE=1
+        else
+          CONF_REQ_FILE_REUSE=0
+        fi
+      else
+        CONF_REQ_FILE_REUSE=1
+      fi
+    else
+      CONF_REQ_FILE_REUSE=0
+    fi
+
+
+    if [ "$CONF_REQ_FILE_REUSE" == "0" ]; then
+        # Create a new OpenSSL, it is not like we have a choice
         echo "$CERT_OPENSSL_CNF_REQ_FILE file is missing, recreating ..."
         ID_INPUT_DATA=""
         input_data "Organization" "$X509_ORG"
@@ -1218,8 +1311,6 @@ function cmd_create_cert {
                 echo "CNF_CA_EXT_EXTRA_A[]: ${CNF_CA_EXT_EXTRA_A[*]}"
 	    fi
         fi
-    else
-        echo "Reusing $CERT_OPENSSL_CNF_REQ_FILE file ..."
     fi
 
     [[ ${VERBOSITY} -ne 0 ]] && echo "Creating $CERT_NODE_TYPE private key ..."
@@ -1414,9 +1505,16 @@ function cmd_create_cert {
 
     # SAN data entry is needed during CSR file creation
 
-    write_generic_cert_req_config_file "$SECTION_NAME_REQ" "$CERT_OPENSSL_CNF_REQ_FILE"
+    if [ "$CONF_REQ_FILE_REUSE" == "0" ]; then
 
-    write_generic_ca_extension_config_file "$SECTION_NAME_CA" "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
+      write_generic_cert_req_config_file \
+                "$SECTION_NAME_REQ" \
+                "$CERT_OPENSSL_CNF_REQ_FILE"
+
+      write_generic_ca_extension_config_file \
+                "$SECTION_NAME_CA" \
+                "${PARENT_IA_OPENSSL_CNF_CA_EXTFILE}"
+    fi
 
     cert_create_public_key
 
