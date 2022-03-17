@@ -1,6 +1,7 @@
 
 ; exclude CA certificate handling (both accidential and test-generated)
 *.key
+*.csr
 *.cert
 *.crt
 *.crl
