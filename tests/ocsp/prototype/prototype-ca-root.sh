@@ -15,10 +15,10 @@ openssl ecparam -list_curves
 openssl ecparam -list_curves | grep '384\|409\|521'
 
 # Generate Private Key for Root CA
-openssl ecparam -genkey -name secp384r1 | openssl ec -aes256 -out ca.cheese.key.pem
+# openssl ecparam -genkey -name secp384r1 | openssl ec -aes256 -out ca.cheese.key.pem
+openssl ecparam -genkey -name secp384r1 | openssl ec -out ca.cheese.key.pem
 
 # Create a Request for Root CA
-# notice that it skips the CSR stage?
 openssl req -config openssl-root.cnf \
     -new \
     -x509 \
@@ -33,4 +33,3 @@ openssl x509 -noout -text -in ca.cheese.crt.pem | grep 'Signature Algorithm:'
 openssl x509 -noout -dates -in ca.cheese.crt.pem -dates -subject -issuer
 openssl x509 -noout -text -in ca.cheese.crt.pem | grep 'Public-Key:'
 openssl x509 -noout -text -in ca.cheese.crt.pem | grep 'NIST CURVE:'
-
