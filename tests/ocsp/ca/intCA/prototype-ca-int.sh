@@ -19,16 +19,8 @@ openssl ecparam -list_curves | grep '384\|409\|521'
 openssl ecparam -genkey -name secp384r1 | openssl ec -aes256 -out intCA.cheese.key.pem
 
 # Create a Request Intermediate Root CA
-# openssl req -config openssl-intermediate-ocsp.cnf \
-#     -new \
-#     -x509 \
-#     -sha384 \
-#     -extensions v3_ca \
-#     -key intCA.cheese.key.pem \
-#     -out intCA.cheese.crt.pem
-
 openssl req \
-    -config openssl-intermediate-ocsp.cnf \
+    -config openssl-intermediate.cnf \
     -new \
     -newkey ec:<(openssl ecparam -name secp384r1) \
     -keyout intCA.cheese.key.pem \

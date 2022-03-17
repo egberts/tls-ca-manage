@@ -26,7 +26,7 @@ function assert_success() {
 # For CRL, there is no request
 # For CRL, just create the server-type PKI cert
 
-openssl ca -config ./openssl-intermediate-ocsp.cnf \
+openssl ca -config ./openssl-intermediate.cnf \
     -gencrl \
     -out ./whomovedmycheese.crl
 assert_success $?
