@@ -1185,10 +1185,25 @@ crl_extensions          = crl_ext               # CRL extensions
 countryName             = match
 stateOrProvinceName     = optional
 localityName            = optional
+organizationName        = supplied
+organizationalUnitName  = optional
+commonName              = supplied
+
+[ same_company_policy ]
+countryName             = match
+stateOrProvinceName     = optional
+localityName            = optional
 organizationName        = match
 organizationalUnitName  = optional
 commonName              = supplied
 
+[ same_division_policy ]
+countryName             = match
+stateOrProvinceName     = optional
+localityName            = optional
+organizationName        = match
+organizationalUnitName  = match
+commonName              = supplied
 
 # For 'any_pol', nothing must match
 
