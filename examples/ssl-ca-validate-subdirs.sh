@@ -70,8 +70,8 @@ function test_and_verify_subdirs()
 
 test_and_verify_subdirs "/etc/ssl/ca"  "${USER}" "ssl-cert" "750"
 test_and_verify_subdirs "/etc/ssl/etc" "${USER}" "ssl-cert" "750"
+test_and_verify_subdirs "/etc/ssl/private" "${USER}" "ssl-cert" "750"
 test_and_verify_subdirs "/etc/ssl/crl" "${USER}" "ssl-cert" "750"
-test_and_verify_subdirs "/etc/ssl/crl" "${USER}" "ssl-cert" "755"
 echo
 
 echo "${BASH_SOURCE[0]}: Done."
