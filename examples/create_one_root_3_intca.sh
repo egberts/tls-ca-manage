@@ -51,25 +51,28 @@ echo "Creating tls-secured-portals server certificate (AcmeComponent intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create tls-secured-portals server AcmeComponent
 assert_success $?
 
-echo "Creating AcmeOCSP ocsp certificate (AcmeComponent intCA) ..."
-${TLS_CERT_MANAGE} $OPTS create AcmeOCSP ocsp AcmeComponent
-assert_success $?
+# TBD
+# echo "Creating AcmeOCSP ocsp certificate (AcmeComponent intCA) ..."
+# ${TLS_CERT_MANAGE} $OPTS create AcmeOCSP ocsp AcmeComponent
+# assert_success $?
 
-echo "Creating AcmeTimeStamping timestamping certificate (AcmeComponent intCA) ..."
-${TLS_CERT_MANAGE} $OPTS create AcmeTimeStamping timestamping AcmeComponent
-assert_success $?
+# TBD
+# echo "Creating AcmeTimeStamping timestamping certificate (AcmeComponent intCA) ..."
+# ${TLS_CERT_MANAGE} $OPTS create AcmeTimeStamping timestamping AcmeComponent
+# assert_success $?
 
-echo "Creating tls-secured-login client certificate (AcmeComponent intCA) ..."
-${TLS_CERT_MANAGE} $OPTS create tls-secured-login client AcmeComponent # TLS Client
-assert_success $?
+# TBD
+# echo "Creating tls-secured-login client certificate (AcmeComponent intCA) ..."
+# ${TLS_CERT_MANAGE} $OPTS create tls-secured-login client AcmeComponent # TLS Client
+# assert_success $?
 
 echo "Creating vpn-servers server certificate (AcmeComponent intCA) ..."
 ${TLS_CERT_MANAGE} $OPTS create vpn-servers server AcmeComponent
 assert_success $?
 
-echo "Creating vpn-servers client certificate (AcmeComponent intCA) ..."
-${TLS_CERT_MANAGE} $OPTS create vpn-clients client AcmeComponent
-assert_success $?
+# echo "Creating vpn-servers client certificate (AcmeComponent intCA) ..."
+# ${TLS_CERT_MANAGE} $OPTS create vpn-clients client AcmeComponent
+# assert_success $?
 
 
 #  Create signing CAs under Identity intermediate CA
@@ -78,28 +81,41 @@ ${TLS_CERT_MANAGE} $OPTS create user-mail-encryption email AcmeIdentity
 assert_success $?
 
 
+# TBD
 # https://blog.benjojo.co.uk/post/tls-https-server-from-a-yubikey
-echo "Creating secured-smartcardkeys smartcard certificate (AcmeIdentity intCA) ..."
-${TLS_CERT_MANAGE} $OPTS create secured-smartcardkeys smartcard AcmeIdentity
-assert_success $?
+# echo "Creating secured-smartcardkeys smartcard certificate (AcmeIdentity intCA) ..."
+# ${TLS_CERT_MANAGE} $OPTS create secured-smartcardkeys smartcard AcmeIdentity
+# assert_success $?
 
 
-echo "Creating user-mail-identity identity certificate (AcmeSecurity intCA) ..."
-${TLS_CERT_MANAGE} $OPTS create user-mail-identity identity AcmeIdentity
-assert_success $?
+# TBD
+# echo "Creating user-mail-identity identity certificate (AcmeSecurity intCA) ..."
+# TBD
+# ${TLS_CERT_MANAGE} $OPTS create user-mail-identity identity AcmeIdentity
+# TBD
+# assert_success $?
 
 
 #  Create signing CAs under Security intermediate CA
-echo "Creating building-cardreaders identity certificate (AcmeSecurity intCA) ..."
-${TLS_CERT_MANAGE} $OPTS create building-cardreaders identity AcmeSecurity
-assert_success $?
+# TBD
+# echo "Creating building-cardreaders identity certificate (AcmeSecurity intCA) ..."
+# TBD
+# ${TLS_CERT_MANAGE} $OPTS create building-cardreaders identity AcmeSecurity
+# TBD
+# assert_success $?
 
-echo "Creating guardstations identity certificate (AcmeSecurity intCA) ..."
-${TLS_CERT_MANAGE} $OPTS create guardstations identity AcmeSecurity
-assert_success $?
+# TBD
+# echo "Creating guardstations identity certificate (AcmeSecurity intCA) ..."
+# TBD
+# ${TLS_CERT_MANAGE} $OPTS create guardstations identity AcmeSecurity
+# TBD
+# assert_success $?
 
-echo "Creating control identity certificate (AcmeSecurity intCA) ..."
-${TLS_CERT_MANAGE} $OPTS create control identity AcmeSecurity
-assert_success $?
+# TBD
+# echo "Creating control identity certificate (AcmeSecurity intCA) ..."
+# TBD
+# ${TLS_CERT_MANAGE} $OPTS create control identity AcmeSecurity
+# TBD
+# assert_success $?
 
 
