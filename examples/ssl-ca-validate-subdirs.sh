@@ -68,10 +68,15 @@ function test_and_verify_subdirs()
   fi
 }
 
-test_and_verify_subdirs "/etc/ssl/ca"  "${USER}" "ssl-cert" "750"
+# there is no reason for general users to examine the SSL config files
 test_and_verify_subdirs "/etc/ssl/etc" "${USER}" "ssl-cert" "750"
-test_and_verify_subdirs "/etc/ssl/private" "${USER}" "ssl-cert" "750"
+
+# CA and CRL should be world read-able.
+test_and_verify_subdirs "/etc/ssl/ca"  "${USER}" "ssl-cert" "750"
 test_and_verify_subdirs "/etc/ssl/crl" "${USER}" "ssl-cert" "750"
+
+# Private directory should be writable only by one-user (at the moment)
+test_and_verify_subdirs "/etc/ssl/private" "${USER}" "ssl-cert" "750"
 echo
 
 echo "${BASH_SOURCE[0]}: Done."

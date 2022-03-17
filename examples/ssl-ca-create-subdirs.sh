@@ -66,9 +66,16 @@ function test_and_mkdir()
   fi
 }
 
-test_and_mkdir "/etc/ssl/ca"  "${THIS_USER}" "${GROUP_SSL_CERT}" "750"
+# there is no reason for general users to examine the SSL config files
 test_and_mkdir "/etc/ssl/etc" "${THIS_USER}" "${GROUP_SSL_CERT}" "750"
-test_and_mkdir "/etc/ssl/crl" "${THIS_USER}" "${GROUP_SSL_CERT}" "750"
+
+# CA and CRL should be world read-able.
+test_and_mkdir "/etc/ssl/ca"  "${THIS_USER}" "${GROUP_SSL_CERT}" "755"
+test_and_mkdir "/etc/ssl/crl" "${THIS_USER}" "${GROUP_SSL_CERT}" "755"
+
+# Private directory should be writable only by one-user (at the moment)
+# Readable by other 'ssl-cert' group (but not by server applications).
+test_and_mkdir "/etc/ssl/private" "${THIS_USER}" "${GROUP_SSL_CERT}" "750"
 echo
 
 echo "Done."
