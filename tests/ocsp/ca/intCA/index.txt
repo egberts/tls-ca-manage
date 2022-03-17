@@ -1,2 +1,0 @@
-V	230317181825Z		1000	unknown	/C=US/ST=WA/L=Seattle/O=Grilled Cheese Inc./OU=Grilled Cheese Intermediary CA/CN=What to put down for an OCSP commonName?/emailAddress=grilledcheese@yummyinmytummy.us
-V	230317190252Z		1001	unknown	/C=US/ST=WA/L=Seattle/O=Grilled Cheese Inc./OU=Grilled Cheese Intermediary CA/CN=Some commonName that we have not been able to come up with yet?/emailAddress=grilledcheese@yummyinmytummy.us
