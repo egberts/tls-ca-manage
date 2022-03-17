@@ -34,7 +34,7 @@ openssl req \
     -new \
     -newkey ec:<(openssl ecparam -name secp384r1) \
     -keyout intCA.cheese.key.pem \
-    -out intCA.cheese.csr
+    -out intCA.cheese.csr.pem
 assert_success $?
 echo
 
@@ -45,7 +45,7 @@ openssl ca -config ./openssl-root.cnf \
     -extensions v3_intermediate_ca \
     -days 3600 \
     -md sha384 \
-    -in intCA/intCA.cheese.csr \
+    -in intCA/intCA.cheese.csr.pem \
     -out intCA/intCA.cheese.crt.pem
 assert_success $?
 
