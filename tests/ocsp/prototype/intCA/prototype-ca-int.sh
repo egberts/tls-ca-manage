@@ -27,11 +27,13 @@ function assert_success() {
 # openssl ecparam -list_curves | grep '384\|409\|521'
 
 # Generate Private Key for Intermediate CA
-# openssl ecparam -genkey -name secp384r1 | openssl ec -aes256 -out intCA.cheese.key.pem
-echo "openssl ecparam ... | openssl ec ..."
-openssl ecparam -genkey -name secp384r1 | openssl ec -out intCA.cheese.key.pem
+echo "openssl genpkey -algorithm EC ..."
+openssl genpkey -algorithm EC   \
+    -pkeyopt ec_paramgen_curve:P-521 \
+    -out intCA.cheese.key.pem
 assert_success $?
 echo
+
 
 echo "openssl pkey -check ..."
 $OPENSSL_BIN pkey -inform PEM -noout -in intCA.cheese.key.pem -check
@@ -56,8 +58,7 @@ $OPENSSL_BIN req \
     -config /tmp/x \
     -new \
     -nodes \
-    -newkey ec:<(openssl ecparam -name secp384r1) \
-    -keyout intCA.cheese.key.pem \
+    -key intCA.cheese.key.pem \
     -out intCA.cheese.csr.pem
 assert_success $?
 echo
@@ -86,11 +87,6 @@ assert_success $?
 # go back down
 cd intCA
 
-# echo "openssl ca -verify ..."
-# Not quite there yet....
-# $OPENSSL_BIN req -verify -inform PEM -noout -in intCA.cheese.crt.pem 
-# assert_success $?
-# echo
 
 # Verify the certificate's usage is set for OCSP
 

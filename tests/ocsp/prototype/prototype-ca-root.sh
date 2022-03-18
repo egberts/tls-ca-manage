@@ -22,13 +22,22 @@ OPENSSL_BIN="env OPENSSL_CONF=/dev/null openssl"
 # openssl ecparam -list_curves | grep '384\|409\|521'
 
 # Generate Private Key for Root CA
-# openssl ecparam -genkey -name secp384r1 | openssl ec -aes256 -out ca.cheese.key.pem
-echo "openssl ecparam ... | openssl ec ..."
-$OPENSSL_BIN ecparam -genkey -name secp384r1 | openssl ec -out ca.cheese.key.pem
+
+echo "openssl genpkey -algorithm EC ..."
+openssl genpkey -algorithm EC   \
+    -pkeyopt ec_paramgen_curve:P-521 \
+    -out ca.cheese.key.pem
 assert_success $?
 echo
 
+echo "openssl pkey -check ..."
+$OPENSSL_BIN pkey -inform PEM -noout -in ca.cheese.key.pem -check
+assert_success $?
+echo
+
+
 # Create a Request for Root CA
+
 echo "openssl req ..."
 $OPENSSL_BIN req -config openssl-root.cnf \
     -new \

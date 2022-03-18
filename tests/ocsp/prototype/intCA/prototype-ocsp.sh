@@ -24,9 +24,10 @@ function assert_success() {
 
 
 # Generate Private Key for Intermediate CA
-# openssl ecparam -genkey -name secp384r1 | openssl ec -aes256 -out ocsp.cheese.key.pem
-echo "openssl ecparam ..."
-openssl ecparam -genkey -name secp384r1 | openssl ec -out ocsp.cheese.key.pem
+echo "openssl genpkey -algorithm EC ..."
+openssl genpkey -algorithm EC   \
+    -pkeyopt ec_paramgen_curve:P-521 \
+    -out ca.cheese.key.pem
 assert_success $?
 echo
 
@@ -42,10 +43,10 @@ echo "openssl req ..."
 openssl req \
     -config /tmp/x \
     -extensions ocsp_req \
+    -sha384 \
     -nodes \
     -new \
-    -newkey ec:<(openssl ecparam -name secp384r1) \
-    -keyout ./ocsp.cheese.key.pem \
+    -key ./ocsp.cheese.key.pem \
     -out ./ocsp.cheese.csr.pem
     # -reqexts ./openssl-intermediate-ocsp-req.cnf \
 assert_success $?
@@ -65,7 +66,7 @@ openssl ca \
     -extensions ocsp_ext \
     -days 365 \
     -notext \
-    -md sha384 \
+    -md sha512 \
     -in ./ocsp.cheese.csr.pem \
     -out ./ocsp.cheese.crt.pem
 assert_success $?

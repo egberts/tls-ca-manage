@@ -1,5 +1,5 @@
 #!/bin/bash
-# Title: CRL before OCSP request/sign-with-ca/verify
+# Title: CRL before OCSP sign-with-ca/verify
 #
 # The thing about the data entry here is that
 # commonName must be MANDATORY at data entry time.
@@ -28,6 +28,20 @@ function assert_success() {
 # For CRL, there is no new public key
 # For CRL, there is no request
 # For CRL, just create the server-type PKI cert
+# For CRL, it is all about the preexisting intCA key/crt
+
+# strace -f 
+# openat(AT_FDCWD, "/usr/lib/ssl/openssl.cnf", O_RDONLY) = 3
+# write(2, "Using configuration from ./opens"..., 61Using configuration from ./openssl-intermediateCA-ca-crl.cnf
+# openat(AT_FDCWD, "./openssl-intermediateCA-ca-crl.cnf", O_RDONLY) = 3
+# openat(AT_FDCWD, "./intCA.cheese.key.pem", O_RDONLY) = 3
+# openat(AT_FDCWD, "./intCA.cheese.crt.pem", O_RDONLY) = 3
+# openat(AT_FDCWD, "./index.txt", O_RDONLY) = 3
+# openat(AT_FDCWD, "./index.txt.attr", O_RDONLY) = 4
+# openat(AT_FDCWD, "./crlnumber", O_RDONLY) = 3
+# openat(AT_FDCWD, "/etc/localtime", O_RDONLY|O_CLOEXEC) = 3
+# openat(AT_FDCWD, "./crlnumber.new", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3
+# openat(AT_FDCWD, "./whomovedmycheese.crl.pem", O_WRONLY|O_CREAT|O_TRUNC,
 
 
 echo "openssl ca ..."
