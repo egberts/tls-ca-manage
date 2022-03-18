@@ -6,4 +6,5 @@
 *.crt
 *.crl
 *.pem
+*.der
 *.old
