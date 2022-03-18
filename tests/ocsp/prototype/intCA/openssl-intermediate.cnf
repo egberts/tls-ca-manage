@@ -76,7 +76,8 @@ stateOrProvinceName             = State or Province Name
 localityName                    = Locality Name
 0.organizationName              = Organization Name
 organizationalUnitName          = Organizational Unit Name
-commonName                      = Common Name
+#### we use a UNIX pipe to shove 'commonName' into this file
+####commonName                      = Common Name
 emailAddress                    = Email Address
 
 # Optionally, specify some defaults.
@@ -93,7 +94,8 @@ stateOrProvinceName             = WA
 localityName                    = Seattle
 0.organizationName              = Grilled Cheese Inc.
 organizationalUnitName          = Grilled Cheese Intermediary CA
-commonName                      = Grilled Cheese (commonName)
+#### we use a UNIX pipe to shove 'commonName' into this file
+####commonName                      = Grilled Cheese (commonName)
 emailAddress                    = grilledcheese@yummyinmytummy.us
 
 [ intCA_reqext ]
