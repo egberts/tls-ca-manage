@@ -79,28 +79,38 @@ $OPENSSL_BIN ca -config ./openssl-root.cnf \
     -days 3600 \
     -md sha384 \
     -in intCA/intCA.cheese.csr.pem \
-    -out intCA/intCA.cheese.crt.pem
+    -out intCA/intCA.cheese.crt.pem \
+    -batch
 assert_success $?
 
 # go back down
 cd intCA
 
-echo "openssl ca -verify ..."
+# echo "openssl ca -verify ..."
 # Not quite there yet....
 # $OPENSSL_BIN req -verify -inform PEM -noout -in intCA.cheese.crt.pem 
 # assert_success $?
-echo
+# echo
 
 # Verify the certificate's usage is set for OCSP
 
-echo "openssl x509 ..."
-$OPENSSL_BIN x509 -noout -text -in intCA.cheese.crt.pem
-assert_success $?
+echo "openssl verify ..."
+openssl verify -verbose -no-CApath -CAfile ../ca.cheese.crt.pem intCA.cheese.crt.pem
+retsts=$?
+if [ $retsts -ne 0 ]; then
 
-# Validate the Request for Root CA
-$OPENSSL_BIN x509 -noout -text -in intCA.cheese.crt.pem | grep 'Signature Algorithm:'
-$OPENSSL_BIN x509 -noout -dates -in intCA.cheese.crt.pem -dates -subject -issuer
-$OPENSSL_BIN x509 -noout -text -in intCA.cheese.crt.pem | grep 'Public-Key:'
-$OPENSSL_BIN x509 -noout -text -in intCA.cheese.crt.pem | grep 'NIST CURVE:'
-echo
+  # If successfully verified, do not bother to output it further
+  echo "openssl x509 ..."
+  $OPENSSL_BIN x509 -noout -text -in intCA.cheese.crt.pem
+  assert_success $?
+  echo
+
+  # Validate the Request for Root CA
+  $OPENSSL_BIN x509 -noout -text -in intCA.cheese.crt.pem | grep 'Signature Algorithm:'
+  $OPENSSL_BIN x509 -noout -dates -in intCA.cheese.crt.pem -dates -subject -issuer
+  $OPENSSL_BIN x509 -noout -text -in intCA.cheese.crt.pem | grep 'Public-Key:'
+  $OPENSSL_BIN x509 -noout -text -in intCA.cheese.crt.pem | grep 'NIST CURVE:'
+else
+  echo
+fi
 echo "Done."

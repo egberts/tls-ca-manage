@@ -1,0 +1,9 @@
+
+Google dropped 'secp521r1' from its supported Elliptic Curve algorithm suite.
+
+Rumor is that it was because it wasn't supported by NSA Suite B PKI.
+
+
+Reference:
+
+* https://bugs.chromium.org/p/chromium/issues/detail?id=478225
