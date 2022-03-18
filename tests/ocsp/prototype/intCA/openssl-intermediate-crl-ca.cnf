@@ -1,0 +1,57 @@
+# OpenSSL Intermediary CA configuration file
+#
+# Topic: CRL-only (implicitly CA)
+#
+# Always found in Intermediate and Root CA nodes
+# 
+# Used only during 'openssl ca' by those doing:
+#   - signing request such as OCSP server
+#   - signing request such as TLS serverAuth
+
+[ ca ]
+default_ca = crl_ca
+
+[ crl_ca ]
+# Directory and file locations.
+dir               = .
+# certs             = $dir/certs
+# crl_dir           = $dir/crl
+# new_certs_dir     = $dir/certs
+# database          = $dir/index.txt
+# serial            = $dir/serial
+# RANDFILE          = $dir/private/.rand
+# certs             = $dir
+
+crl_dir           = $dir
+
+# database is required for 'openssl crl'
+database          = $dir/index.txt
+RANDFILE          =
+
+# The root key and root certificate.
+# private_key is required for 'openssl crl'
+private_key       = ./intCA.cheese.key.pem
+# certificate is required for 'openssl crl'
+certificate       = ./intCA.cheese.crt.pem
+
+# For certificate revocation lists.
+crlnumber         = $dir/crlnumber
+
+# who really uses the 'crl' variable here?  Save to delete?
+# must be internal to this config file, and not the 'openssl crl'
+crl               = $dir/whomovedmycheese.crl
+
+crl_extensions    = crl_ext
+default_crl_days  = 15
+
+# SHA-1 is deprecated, so use SHA-2 or SHA-3 instead.
+default_md        = sha384
+
+# name_opt          = ca_default
+# cert_opt          = ca_default
+
+[ crl_ext ]
+# Extension for CRLs (`man x509v3_config`).
+authorityKeyIdentifier=keyid:always
+
+

@@ -56,7 +56,9 @@ emailAddress            = optional
 # [ 'req' ] is used only during REQuest of end-certs against this intermediate CA
 [ req ]
 # Options for the `req` tool (`man req`).
-distinguished_name  = intermediate_ca_req_distinguished_name
+prompt			= no
+distinguished_name  = intermediate_ca_req_distinguished_name_no_prompt
+# distinguished_name  = intermediate_ca_req_distinguished_name
 req_extensions      = intCA_reqext
 default_bits        = 2048
 string_mask         = utf8only
@@ -84,6 +86,15 @@ localityName_default            = Seattle
 0.organizationName_default      = Grilled Cheese Inc.
 organizationalUnitName_default  = Grilled Cheese Intermediary CA
 emailAddress_default            = grilledcheese@yummyinmytummy.us
+
+[ intermediate_ca_req_distinguished_name_no_prompt ]
+countryName                     = US
+stateOrProvinceName             = WA
+localityName                    = Seattle
+0.organizationName              = Grilled Cheese Inc.
+organizationalUnitName          = Grilled Cheese Intermediary CA
+commonName                      = Grilled Cheese (commonName)
+emailAddress                    = grilledcheese@yummyinmytummy.us
 
 [ intCA_reqext ]
 keyUsage = critical, keyCertSign, cRLSign

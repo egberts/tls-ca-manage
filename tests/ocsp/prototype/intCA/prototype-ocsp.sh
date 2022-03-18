@@ -8,6 +8,9 @@
 #    * Create request certificate
 #    * Create signed by CA certificate
 
+echo "Create TLS server authentication PKI certificate for OCSP server"
+echo
+
 function assert_success() {
   if [ $1 -ne 0 ]; then
     echo "Errno $1; aborted."
@@ -15,14 +18,23 @@ function assert_success() {
   fi
 }
 
+# to turn off password:
+#   remove -aes256 from 'openssl ec'
+#   add -nodes to 'openssl req'
+
+
 # Generate Private Key for Intermediate CA
-openssl ecparam -genkey -name secp384r1 | openssl ec -aes256 -out ocsp.cheese.key.pem
+# openssl ecparam -genkey -name secp384r1 | openssl ec -aes256 -out ocsp.cheese.key.pem
+echo "openssl ecparam ..."
+openssl ecparam -genkey -name secp384r1 | openssl ec -out ocsp.cheese.key.pem
 assert_success $?
 echo
 
+echo "openssl req ..."
 openssl req \
     -config ./openssl-ocsp-req.cnf \
     -extensions ocsp_req \
+    -nodes \
     -new \
     -newkey ec:<(openssl ecparam -name secp384r1) \
     -keyout ./ocsp.cheese.key.pem \
@@ -31,9 +43,15 @@ openssl req \
 assert_success $?
 echo
 
+echo "openssl x509 ..."
+openssl req -noout -text -in ./ocsp.cheese.csr.pem
+assert_success $?
+echo
+
 
 # Sign the CSR with our Intermediary Certificate Authority
 
+echo "openssl ca ..."
 openssl ca \
     -config ./openssl-intermediate-ocsp-ca.cnf \
     -extensions ocsp_ext \
@@ -47,6 +65,7 @@ echo
 
 # Display the certificate for OCSP server
 
+echo "openssl x509 ..."
 openssl x509 -noout -text -in ./ocsp.cheese.crt.pem
 assert_success $?
 echo
@@ -64,6 +83,7 @@ echo
 cp intCA.cheese.crt.pem intCA.cheese.chain.crt.pem
 cat ../ca.cheese.crt.pem >> intCA.cheese.chain.crt.pem
 
+echo "openssl verify ..."
 openssl verify -no-CApath -CAfile intCA.cheese.chain.crt.pem ocsp.cheese.crt.pem
 assert_success $?
 echo

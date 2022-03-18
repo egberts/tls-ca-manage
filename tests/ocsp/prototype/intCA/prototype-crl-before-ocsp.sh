@@ -15,6 +15,9 @@
 #
 # So, we have a working prototype here.
 
+echo "Create CRL PKI certificate (sign-with-intermediate-ca/verify)"
+echo
+
 function assert_success() {
   if [ $1 -ne 0 ]; then
     echo "Errno $1; aborted."
@@ -26,32 +29,47 @@ function assert_success() {
 # For CRL, there is no request
 # For CRL, just create the server-type PKI cert
 
-openssl ca -config ./openssl-intermediate-ocsp-ca.cnf \
+echo "openssl ca ..."
+openssl ca -config ./openssl-intermediate-crl-ca.cnf \
     -gencrl \
-    -out ./whomovedmycheese.crl
+    -out ./whomovedmycheese.crl.pem
 assert_success $?
 
 
 # Verify the CRL
 echo "Simple parser of CRL ..."
-openssl crl -in ./whomovedmycheese.crl \
+openssl crl -in ./whomovedmycheese.crl.pem \
     -noout 
 assert_success $?
 echo
 
 # Really verify the CRL against the CA
-echo "Verify CRL against CA ..."
+# Surprisenly, no chaining here.
+echo "Verify CRL against CA (PEM-format)..."
 openssl crl -verify \
     -CAfile ./intCA.cheese.crt.pem \
     -noout \
-    -in ./whomovedmycheese.crl
+    -in ./whomovedmycheese.crl.pem
+assert_success $?
+echo
+
+# Convert PEM to DER
+echo "Making a DER format out of this CRL PEM ..."
+openssl crl \
+    -in ./whomovedmycheese.crl.pem \
+    -out ./whomovedmycheese.crl.der \
+    -outform DER
+assert_success $?
+echo
+
+echo "Verify CRL against CA (DER-format)..."
+openssl crl -verify \
+    -CAfile ./intCA.cheese.crt.pem \
+    -noout \
+    -text \
+    -in ./whomovedmycheese.crl.pem
 assert_success $?
 echo
 
 
-# Validate the Request for Root CA
-openssl x509 -noout -text -in intCA.cheese.crt.pem | grep 'Signature Algorithm:'
-openssl x509 -noout -dates -in intCA.cheese.crt.pem -dates -subject -issuer
-openssl x509 -noout -text -in intCA.cheese.crt.pem | grep 'Public-Key:'
-openssl x509 -noout -text -in intCA.cheese.crt.pem | grep 'NIST CURVE:'
-
+echo "Done."
