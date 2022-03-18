@@ -17,11 +17,21 @@ certificate for the OCSP server-side:
 
 ```bash
 cd ca
+./prototype-ca-root-reset.sh
 ./prototype-ca-root.sh
+./prototype-ca-root.sh    # as many as you can restart
 cd intCA
-./prototype-ca-int.sh
+./prototype-ca-int-reset.sh
+./prototype-ca-int.sh    # original S/N 1000
+./prototype-ca-int.sh    # overwrite S/N 1001 (not renewal)
+./prototype-ca-int.sh    # overwrite S/N 1002 (not renewal)
+./prototype-ca-int.sh    # overwrite S/N 1003 (not renewal)
 ./prototype-crl-before-ocsp.sh
-./prototype-ocsp.sh
+./prototype-ocsp.sh      # original
+./prototype-ocsp.sh      # overwrite S/N 1001 (not renewal)
+./prototype-ocsp.sh      # overwrite S/N 1002 (not renewal)
+./prototype-ocsp.sh      # overwrite S/N 1003 (not renewal)
+./prototype-ocsp.sh      # overwrite S/N 1004 (not renewal)
 
 
 References:

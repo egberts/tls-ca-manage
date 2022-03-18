@@ -35,6 +35,9 @@ printf "%s\n\n[ocsp_req_distinguished_name_no_prompt]\ncommonName=$commonName s/
     "$(cat openssl-ocsp-req.cnf)" "$(cat serial)" \
     > /tmp/x
 echo "Using commonName=\"$commonName\""
+
+
+
 echo "openssl req ..."
 openssl req \
     -config /tmp/x \
@@ -58,7 +61,7 @@ echo
 
 echo "openssl ca ..."
 openssl ca \
-    -config ./openssl-intermediate-ocsp-ca.cnf \
+    -config ./openssl-intermediateCA-ca-ocsp.cnf \
     -extensions ocsp_ext \
     -days 365 \
     -notext \

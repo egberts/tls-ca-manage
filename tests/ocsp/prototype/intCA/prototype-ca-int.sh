@@ -43,10 +43,11 @@ echo
 commonName="Intermediate CA S/N $(cat ../serial)"
 echo "commonName: $commonName"
 
+
 # Create a Request Intermediate Root CA
 commonName="Intermediate CA"
 printf "%s\n\n[intermediate_ca_req_distinguished_name_no_prompt]\ncommonName=$commonName s/n %s\n" \
-    "$(cat openssl-intermediate.cnf)" "$(cat ../serial)" \
+    "$(cat openssl-intermediateCA-req.cnf)" "$(cat ../serial)" \
     > /tmp/x
 echo "Using commonName=\"$commonName\""
 
@@ -72,6 +73,7 @@ echo "Going up to Root CA directory"
 cd ..    # go into Root CA $dir
 
 echo "Signing this intCA with rootCA certs ..."
+#  normally it's openssl-root-ca.cnf, but they're self-signed.
 $OPENSSL_BIN ca -config ./openssl-root.cnf \
     -extensions v3_intermediate_ca \
     -days 3600 \
