@@ -79,8 +79,7 @@ stateOrProvinceName_default     = WA
 localityName_default            = Seattle
 0.organizationName_default      = Grilled Cheese Inc.
 organizationalUnitName_default  = Grilled Cheese OCSP Responder
-### shove commonName from command line
-###commonName_default              = Grilled Cheese OCSP Responder (commonName)
+commonName_default              = Grilled Cheese OCSP Responder (commonName)
 emailAddress_default            = grilledcheese@yummyinmytummy.us
 
 [ ocsp_req_distinguished_name_no_prompt ]
@@ -89,8 +88,7 @@ stateOrProvinceName             = WA
 localityName                    = Seattle
 0.organizationName              = Grilled Cheese Inc.
 organizationalUnitName          = Grilled Cheese OCSP Responder
-### shove commonName from command line
-###commonName			= Grilled Cheese OCSP Responder (commonName)
+commonName			= Grilled Cheese OCSP Responder (commonName)
 emailAddress                    = grilledcheese@yummyinmytummy.us
 
 # formerly 'server_req'

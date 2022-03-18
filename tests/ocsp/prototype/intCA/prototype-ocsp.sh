@@ -31,17 +31,17 @@ openssl genpkey -algorithm EC   \
 assert_success $?
 echo
 
-commonName="OCSP Responder"
-printf "%s\n\n[ocsp_req_distinguished_name_no_prompt]\ncommonName=$commonName s/n %s\n" \
-    "$(cat openssl-ocsp-req.cnf)" "$(cat serial)" \
-    > /tmp/x
-echo "Using commonName=\"$commonName\""
+# commonName="OCSP Responder"
+# printf "%s\n\n[ocsp_req_distinguished_name_no_prompt]\ncommonName=$commonName s/n %s\n" \
+#     "$(cat openssl-ocsp-req.cnf)" "$(cat serial)" \
+#     > /tmp/x
+# echo "Using commonName=\"$commonName\""
 
 
 
 echo "openssl req ..."
 openssl req \
-    -config /tmp/x \
+    -config openssl-ocsp-req.cnf \
     -extensions ocsp_req \
     -sha384 \
     -nodes \
@@ -61,6 +61,15 @@ echo
 # Sign the CSR with our Intermediary Certificate Authority
 
 echo "openssl ca ..."
+echo "================================================================"
+echo "If you got 'ERROR:There is already a certificate' error, you are"
+echo "attempting to overwrite an existing cert."
+echo "================================================================"
+echo "Until we write a 'prototype-ca-int-renewal.sh', just execute:"
+echo
+echo "   prototype-ca-int-reset.sh"
+echo
+echo "And repeat this $0 command."
 openssl ca \
     -config ./openssl-intermediateCA-ca-ocsp.cnf \
     -extensions ocsp_ext \
@@ -75,7 +84,7 @@ echo
 # Display the certificate for OCSP server
 
 echo "openssl x509 ..."
-openssl x509 -noout -text -in ./ocsp.cheese.crt.pem
+openssl x509 -noout -in ./ocsp.cheese.crt.pem
 assert_success $?
 echo
 
