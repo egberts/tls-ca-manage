@@ -30,9 +30,14 @@ openssl ecparam -genkey -name secp384r1 | openssl ec -out ocsp.cheese.key.pem
 assert_success $?
 echo
 
+commonName="OCSP Responder"
+printf "%s\n\n[ocsp_req_distinguished_name_no_prompt]\ncommonName=$commonName s/n %s\n" \
+    "$(cat openssl-ocsp-req.cnf)" "$(cat serial)" \
+    > /tmp/x
+echo "Using commonName=\"$commonName\""
 echo "openssl req ..."
 openssl req \
-    -config ./openssl-ocsp-req.cnf \
+    -config /tmp/x \
     -extensions ocsp_req \
     -nodes \
     -new \

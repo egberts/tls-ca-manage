@@ -44,12 +44,13 @@ commonName="Intermediate CA S/N $(cat ../serial)"
 echo "commonName: $commonName"
 
 # Create a Request Intermediate Root CA
-echo "openssl req ..."
-cp openssl-intermediate.cnf /tmp/x
 commonName="Intermediate CA"
 printf "%s\n\n[intermediate_ca_req_distinguished_name_no_prompt]\ncommonName=$commonName s/n %s\n" \
     "$(cat openssl-intermediate.cnf)" "$(cat ../serial)" \
     > /tmp/x
+echo "Using commonName=\"$commonName\""
+
+echo "openssl req ..."
 $OPENSSL_BIN req \
     -config /tmp/x \
     -new \
