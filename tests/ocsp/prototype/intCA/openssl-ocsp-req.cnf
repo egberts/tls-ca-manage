@@ -1,6 +1,6 @@
 # OpenSSL OCSP PKI server configuration file
 # 
-# Used only during 'openssl ca'
+# Used only during 'openssl req'
 
 [ ca ]
 default_ca = int_ca
@@ -78,7 +78,8 @@ localityName_default            = Seattle
 organizationalUnitName_default  = Grilled Cheese Intermediary CA
 emailAddress_default            = grilledcheese@yummyinmytummy.us
 
-[ ocsp_ext ]
+# formerly 'server_req'
+[ ocsp_req ]
 # Extensions for server certificates (`man x509v3_config`).
 basicConstraints = CA:FALSE
 nsCertType = server

@@ -1,8 +1,59 @@
 # OpenSSL Intermediary CA configuration file
-# Copy to /root/ca/intermediate/openssl_intermediate.cnf
 # 
-# Used only during 'openssl req'
+# Used only during 'openssl ca' by those doing:
+#   - signing request such as OCSP server
+#   - signing request such as TLS serverAuth
 
+[ ca ]
+default_ca = int_ca
+
+[ int_ca ]
+# Directory and file locations.
+dir               = .
+# certs             = $dir/certs
+# crl_dir           = $dir/crl
+# new_certs_dir     = $dir/certs
+# database          = $dir/index.txt
+# serial            = $dir/serial
+# RANDFILE          = $dir/private/.rand
+certs             = $dir
+crl_dir           = $dir
+new_certs_dir     = $dir
+database          = $dir/index.txt
+serial            = $dir/serial
+RANDFILE          =
+
+# The root key and root certificate.
+private_key       = ./intCA.cheese.key.pem
+certificate       = ./intCA.cheese.crt.pem
+
+# For certificate revocation lists.
+crlnumber         = $dir/crlnumber
+crl               = $dir/whomovedmycheese.crl
+crl_extensions    = crl_ext
+default_crl_days  = 180
+
+# SHA-1 is deprecated, so use SHA-2 or SHA-3 instead.
+default_md        = sha384
+
+name_opt          = ca_default
+cert_opt          = ca_default
+default_days      = 3000
+preserve          = no
+policy            = policy_loose
+
+[ policy_loose ]
+# Allow the intermediate CA to sign a more diverse range of certificates.
+# See the POLICY FORMAT section of the `ca` man page.
+countryName             = optional
+stateOrProvinceName     = optional
+localityName            = optional
+organizationName        = optional
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+
+# [ 'req' ] is used only during REQuest of end-certs against this intermediate CA
 [ req ]
 # Options for the `req` tool (`man req`).
 distinguished_name  = intermediate_ca_req_distinguished_name

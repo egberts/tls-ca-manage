@@ -1,6 +1,8 @@
 # OpenSSL Intermediary CA configuration file
 # 
-# Used only during 'openssl req' during OCSP server request
+# Used only during 'openssl ca' by those doing:
+#   - signing request such as OCSP server
+#   - signing request such as TLS serverAuth
 
 [ ca ]
 default_ca = int_ca

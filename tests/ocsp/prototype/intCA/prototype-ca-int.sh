@@ -21,13 +21,6 @@ openssl ecparam -genkey -name secp384r1 | openssl ec -out intCA.cheese.key.pem
 echo
 
 # Create a Request Intermediate Root CA
-# openssl req -config openssl-intermediate-ocsp.cnf \
-#     -new \
-#     -x509 \
-#     -sha384 \
-#     -extensions v3_ca \
-#     -key intCA.cheese.key.pem \
-#     -out intCA.cheese.crt.pem
 echo "openssl req ..."
 openssl req \
     -config openssl-intermediate.cnf \
