@@ -1,4 +1,8 @@
+This file is obsoleted, see OPENSSL_CNF.md
+URL: https://egbert.net/blog/openssl-conf-by-section.html
 
+new Source: https://github.com/egberts/egberts.github.io/content/articles/openssl-conf-by-section.md
+old Source: https://github.com/egberts/tls-ca-manage/doc/OPENSSL-CONF.md
 
 Section names:
 
@@ -14,8 +18,8 @@ unnamed or 'default section get searched too.
 
 Section "req"  default settings are:
 
-input_password=   # <filespec>
-output_password=  # <filespec>
+input_password=   # <string>
+output_password=  # <string>
 default_bits=2048 # <512-\*, 2048>
 default_keyfile=  # <filespec>
 oid_file=         # <filespec>

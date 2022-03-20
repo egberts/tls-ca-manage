@@ -1,3 +1,13 @@
+This altSubjectName extension MUST contain at least one entry. Each entry MUST be either a
+dNSName containing the Fully‐Qualified Domain Name or an iPAddress containing
+the IP address of a server.
+
+CAs SHALL NOT issue certificates with a subjectAltName extension or
+subject:commonName field containing a Reserved IP Address or Internal Name.
+
+Entries in the dNSName MUST be in the “preferred name syntax”, as specified in RFC
+5280, and thus MUST NOT contain underscore characters (”_”).
+
 
 Inserting SAN into openssl CLI
 ==============================

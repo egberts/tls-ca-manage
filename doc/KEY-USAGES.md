@@ -1,3 +1,10 @@
+This file is obsoleted.
+See https://egbert.net/blog/openssl-x509v3.html
+Old Source: https://github.com/egberts/tls-ca-manage/doc/X509V3-SETTINGS.md
+
+New Source: https://github.com/egberts/egbert.github.io-src/content/articles/openssl-x509v3.md
+
+
 
 x509v3 extendedKeyUsage
 OID: 1.3.6.1.4.1.311.80.1
