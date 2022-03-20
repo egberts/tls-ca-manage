@@ -405,6 +405,37 @@ subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 keyUsage                = critical,keyCertSign,cRLSign
 
+####################################################################
+#  Intermediate CA (non-leaf)
+####################################################################
+# openssl req -new \
+#    -config etc/network-ca.conf \
+#    -out ca/network-ca.csr \
+#    -keyout ca/network-ca/private/network-ca.key
+# `openssl req` for network CA
+[ req ]
+req_extensions          = ca_reqext
+
+[ ca_reqext ]
+basicConstraints        = critical,CA:true
+subjectKeyIdentifier    = hash
+keyUsage                = critical,keyCertSign,cRLSign
+
+# openssl ca \
+#     -config etc/root-ca.conf \
+#     -in ca/network-ca.csr \
+#     -out ca/network-ca.crt \
+#     -extensions intermediate_ca_ext \
+#     -enddate 20301231235959Z
+[ intermediate_ca_ext ]
+keyUsage                = critical,keyCertSign,cRLSign
+basicConstraints        = critical,CA:true
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+certificatePolicies     = blueMediumAssurance,blueMediumDevice
+
 ######################################################################
 # Software CA
 ######################################################################
@@ -432,6 +463,7 @@ basicConstraints        = critical,CA:true,pathlen:0
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 keyUsage                = critical,keyCertSign,cRLSign
+extendedKeyUsage        = codeSigning
 authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
@@ -461,6 +493,8 @@ basicConstraints        = critical,CA:true,pathlen:0
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 keyUsage                = critical,keyCertSign,cRLSign
+# you could choose one of `serverAuth` and `clientAuth`
+extendedKeyUsage        = serverAuth,clientAuth
 authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
@@ -494,6 +528,39 @@ keyUsage                = critical,keyCertSign,cRLSign
 extendedKeyUsage        = emailProtection,clientAuth
 authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
+
+
+######################################################################
+# Identity CA
+######################################################################
+# openssl req -new \
+#    -config etc/identity-ca.conf \
+#    -out ca/identity-ca.csr \
+#    -keyout ca/identity-ca/private/identity-ca.key
+# CNF file: identity-ca.conf
+# req_extensions          = identity_reqext
+[ identity_reqext ]
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = emailProtection,clientAuth
+subjectKeyIdentifier    = hash
+subjectAltName          = email:move
+
+# used by 'openssl ca'
+# openssl ca \
+#    -config etc/network-ca.conf \
+#    -in ca/identity-ca.csr \
+#    -out ca/identity-ca.crt \
+#    -extensions identity_signing_ca_ext
+# CNF file: network-ca.conf (or root-ca.conf or other intCA.conf)
+[ identity_signing_ca_ext ]
+keyUsage                = critical,keyCertSign,cRLSign
+basicConstraints        = critical,CA:true,pathlen:0
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+certificatePolicies     = blueMediumAssurance,blueMediumDevice
+
 
 
 ######################################################################
@@ -558,7 +625,7 @@ basicConstraints        = CA:false
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid:always
 keyUsage                = critical,digitalSignature,keyEncipherment
-extendedKeyUsage        = emailProtection,clientAuth,anyExtendedKeyUsage
+extendedKeyUsage        = emailProtection,clientAuth
 authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
@@ -628,6 +695,129 @@ extendedKeyUsage        = clientAuth
 authorityInfoAccess     = @issuer_info
 crlDistributionPoints   = @crl_info
 
+
+######################################################################
+# Timestamping certificate
+######################################################################
+# used by `openssl req`
+# openssl req -new \
+#    -config etc/timestamp.conf \
+#    -out certs/tsa.csr \
+#    -keyout certs/tsa.key
+# CNF file: timestamp.conf
+[ req ]
+req_extensions          = timestamp_reqext
+
+[ timestamp_reqext ]
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = critical,timeStamping
+subjectKeyIdentifier    = hash
+
+# openssl ca \
+#    -config etc/component-ca.conf \
+#    -in certs/tsa.csr \
+#    -out certs/tsa.crt \
+#    -extensions timestamp_ext \
+#    -days 1826
+# CNF file: component-ca.conf
+[ timestamp_ext ]
+basicConstraints        = CA:false
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = critical,timeStamping
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+certificatePolicies     = blueMediumDevice
+
+######################################################################
+# Identity certificate
+######################################################################
+# openssl req -new \
+#    -config etc/identity.conf \
+#    -out certs/fred-id.csr \
+#    -keyout certs/fred-id.key
+# CNF file: identity.conf
+[ identity_reqext ]
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = emailProtection,clientAuth
+subjectKeyIdentifier    = hash
+subjectAltName          = email:move
+
+# openssl ca \
+#    -config etc/identity-ca.conf \
+#    -in certs/fred-id.csr \
+#    -out certs/fred-id.crt \
+#    -extensions identity_ext
+# CNF file: identity-ca.conf
+[ identity_ext ]
+keyUsage                = critical,digitalSignature
+basicConstraints        = CA:false
+extendedKeyUsage        = emailProtection,clientAuth,msSmartcardLogin
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+certificatePolicies     = blueMediumAssurance
+
+######################################################################
+# OCSP certificate
+######################################################################
+# openssl req -new \
+#    -config etc/ocspsign.conf \
+#    -out certs/ocsp.csr \
+#    -keyout certs/ocsp.key
+[ ocspsign_reqext ]
+subjectKeyIdentifier    = hash
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = critical,OCSPSigning
+
+# openssl ca \
+#    -config etc/component-ca.conf \
+#    -in certs/ocsp.csr \
+#    -out certs/ocsp.crt \
+#    -extensions ocspsign_ext \
+#    -days 14
+# CNF file: component-ca.conf
+[ ocspsign_ext ]
+basicConstraints        = CA:false
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = critical,OCSPSigning
+authorityInfoAccess     = @issuer_info
+certificatePolicies     = blueMediumDevice
+noCheck                 = null
+
+######################################################################
+# Encryption certificate
+######################################################################
+# openssl req -new \
+#    -config etc/encryption.conf \
+#    -out certs/fred-enc.csr \
+#    -keyout certs/fred-enc.key
+# req_extensions          = encryption_reqext
+[ encryption_reqext ]
+keyUsage                = critical,keyEncipherment
+extendedKeyUsage        = emailProtection
+subjectKeyIdentifier    = hash
+subjectAltName          = email:move
+
+# openssl ca \
+#     -config etc/identity-ca.conf \
+#     -in certs/fred-enc.csr \
+#     -out certs/fred-enc.crt \
+#     -extensions encryption_ext
+[ encryption_ext ]
+basicConstraints        = CA:false
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,keyEncipherment
+extendedKeyUsage        = emailProtection,msEFS
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+
+certificatePolicies     = blueMediumAssurance
 
 ######################################################################
 # OpenSSL default
