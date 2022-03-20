@@ -1,0 +1,644 @@
+#
+# OpenSSL example configuration file.
+# This is mostly being used for generation of certificate requests.
+#
+
+# Note that you can include other files from the main configuration
+# file using the .include directive.
+#.include filename
+
+# This definition stops the following lines choking if HOME isn't
+# defined.
+HOME			= .
+
+name_utf8_opt		= multiline,-esc_msb,utf8
+
+# Extra OBJECT IDENTIFIER info:
+#oid_file		= $ENV::HOME/.oid
+oid_section		= new_oids
+
+# System default (read from /usr/lib/ssl/openssl.cnf)
+openssl_conf = default_conf
+
+# To use this configuration file with the "-extfile" option of the
+# "openssl x509" utility, name here the section containing the
+# X.509v3 extensions to use:
+# extensions		=
+# (Alternatively, use a configuration file that has only
+# X.509v3 extensions in its main [= default] section.)
+#
+oid_section		= new_oids
+
+[ new_oids ]
+my_policy_oid   = 1.3.6.1.5
+
+[ new_oids ]
+
+# We can add new OIDs in here for use by 'ca', 'req' and 'ts'.
+# Add a simple OID like this:
+# testoid1=1.2.3.4
+# Or use config file substitution like this:
+# testoid2=${testoid1}.5.6
+
+# Policies used by the TSA examples.
+tsa_policy1 = 1.2.3.4.1
+tsa_policy2 = 1.2.3.4.5.6
+tsa_policy3 = 1.2.3.4.5.7
+
+####################################################################
+[ ca ]
+# passing '-name' during 'openssl ca' will change 'default_ca'
+default_ca	= CA_default		# The default ca section
+
+####################################################################
+[ CA_default ]
+
+dir		= ./demoCA		# Where everything is kept
+certs		= $dir/certs		# Where the issued certs are kept
+crl_dir		= $dir/crl		# Where the issued crl are kept
+database	= $dir/index.txt	# database index file.
+#unique_subject	= no			# Set to 'no' to allow creation of
+					# several certs with same subject.
+new_certs_dir	= $dir/newcerts		# default place for new certs.
+
+certificate	= $dir/cacert.pem 	# The CA certificate
+# use '-create_serial' option to reset
+serial		= $dir/serial 		# The current serial number
+crlnumber	= $dir/crlnumber	# the current crl number
+					# must be commented out to leave a V1 CRL
+crl		= $dir/crl.pem 		# The current CRL
+private_key	= $dir/private/cakey.pem# The private key
+
+x509_extensions	= usr_cert		# The extensions to add to the cert
+
+# 'name_opt' is for the Subject Name (SN) only.
+# 'ca_default' is an option ONLY for 'name_opt' or 'cert_opt'
+# 'ca_default' is not related to section names like 'CA_default' or 'default_ca'
+# Other common options are: multiline, -esc_msb, utf8 (RootCA)
+# Comment out the following two lines for the "traditional"
+# (and highly broken) format.
+# All `name_opt` options are: esc_2253 esc_2254 esc_ctrl esc_msb use_quote utf8 ignore_type show_type dump_all dump_nostr dump_der compat sep_comma_plus sep_comma_plus_space sep_semi_plus_space sep_multiline dn_rev nofname sname lname align oid space_eq dump_unknown RFC2253 oneline multiline ca_default 
+name_opt 	= name_utf8_opt		# Subject Name options
+# `cert_opt` is for the distinguished names (DN) only.
+# All `cert_opt` options are: compatible no_header no_version no_serial no_signame no_validity no_subject no_issuer no_pubkey no_extensions no_sigdump no_aux no_attributes ext_default ext_error ext_parse ext_dump
+cert_opt 	= ca_default		# Certificate field options
+
+# Extension copying option: use with caution.
+# copy_extensions = copy
+
+# Extensions to add to a CRL. Note: Netscape communicator chokes on V2 CRLs
+# so this is commented out by default to leave a V1 CRL.
+# crlnumber must also be commented out to leave a V1 CRL.
+# crl_extensions	= crl_ext
+
+default_days	= 365			# how long to certify for
+default_crl_days= 30			# how long before next CRL
+default_md	= default		# use public key default MD
+preserve	= no			# keep passed DN ordering from REQ to CA
+
+# A few difference way of specifying how similar the request should look
+# For type CA, the listed attributes must be the same, and the optional
+# and supplied fields are just that :-)
+policy		= policy_match
+
+# For the parent CA policy
+# All fields listed as "match" must be same as parent CA.
+# All fields listed as "supplied" must be present. 
+# All fields listed as "optional" are allowed, but not required to be there.
+[ policy_match ]
+countryName		= match
+stateOrProvinceName	= match
+organizationName	= match
+organizationalUnitName	= optional
+commonName		= supplied
+emailAddress		= optional
+
+# For the 'anything' policy
+# At this point in time, you must list all acceptable 'object'
+# types.
+[ policy_anything ]
+countryName		= optional
+stateOrProvinceName	= optional
+localityName		= optional
+organizationName	= optional
+organizationalUnitName	= optional
+commonName		= supplied
+emailAddress		= optional
+
+####################################################################
+[ req ]
+default_bits		= 2048
+default_keyfile 	= privkey.pem
+distinguished_name	= req_distinguished_name
+attributes		= req_attributes
+x509_extensions	= v3_ca	# The extensions to add to the self signed cert
+
+# Passwords for private keys if not present they will be prompted for
+# input_password = secret
+# output_password = secret
+
+# This sets a mask for permitted string types. There are several options.
+# default: PrintableString, T61String, BMPString.
+# pkix	 : PrintableString, BMPString (PKIX recommendation before 2004)
+# utf8only: only UTF8Strings (PKIX recommendation after 2004).
+# nombstr : PrintableString, T61String (no BMPStrings or UTF8Strings).
+# MASK:XXXX a literal mask value.
+# WARNING: ancient versions of Netscape crash on BMPStrings or UTF8Strings.
+string_mask = utf8only
+
+# req_extensions = v3_req # The extensions to add to a certificate request
+
+[ req_distinguished_name ]
+countryName			= Country Name (2 letter code)
+countryName_default		= AU
+countryName_min			= 2
+countryName_max			= 2
+
+stateOrProvinceName		= State or Province Name (full name)
+stateOrProvinceName_default	= Some-State
+
+localityName			= Locality Name (eg, city)
+
+0.organizationName		= Organization Name (eg, company)
+0.organizationName_default	= Internet Widgits Pty Ltd
+
+# we can do this but it is not needed normally :-)
+#1.organizationName		= Second Organization Name (eg, company)
+#1.organizationName_default	= World Wide Web Pty Ltd
+
+organizationalUnitName		= Organizational Unit Name (eg, section)
+#organizationalUnitName_default	=
+
+commonName			= Common Name (e.g. server FQDN or YOUR name)
+commonName_max			= 64
+
+emailAddress			= Email Address
+emailAddress_max		= 64
+
+# SET-ex3			= SET extension number 3
+
+[ req_attributes ]
+challengePassword		= A challenge password
+challengePassword_min		= 4
+challengePassword_max		= 20
+
+unstructuredName		= An optional company name
+
+[ usr_cert ]
+
+# These extensions are added when 'ca' signs a request.
+
+# This goes against PKIX guidelines but some CAs do it and some software
+# requires this to avoid interpreting an end user certificate as a CA.
+
+basicConstraints=CA:FALSE
+
+# Here are some examples of the usage of nsCertType. If it is omitted
+# the certificate can be used for anything *except* object signing.
+
+# This is OK for an SSL server.
+# nsCertType			= server
+
+# For an object signing certificate this would be used.
+# nsCertType = objsign
+
+# For normal client use this is typical
+# nsCertType = client, email
+
+# and for everything including object signing:
+# nsCertType = client, email, objsign
+
+# This is typical in keyUsage for a client certificate.
+# keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+
+# This will be displayed in Netscape's comment listbox.
+nsComment			= "OpenSSL Generated Certificate"
+
+# PKIX recommendations harmless if included in all certificates.
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer
+
+# This stuff is for subjectAltName and issuerAltname.
+# Import the email address.
+# subjectAltName=email:copy
+# An alternative to produce certificates that aren't
+# deprecated according to PKIX.
+# subjectAltName=email:move
+
+# Copy subject details
+# issuerAltName=issuer:copy
+
+#nsCaRevocationUrl		= http://www.domain.dom/ca-crl.pem
+#nsBaseUrl
+#nsRevocationUrl
+#nsRenewalUrl
+#nsCaPolicyUrl
+#nsSslServerName
+
+# This is required for TSA certificates.
+# extendedKeyUsage = critical,timeStamping
+
+[ v3_req ]
+
+# Extensions to add to a certificate request
+
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+
+[ v3_ca ]
+
+
+# Extensions for a typical CA
+
+
+# PKIX recommendation.
+
+subjectKeyIdentifier=hash
+
+authorityKeyIdentifier=keyid:always,issuer
+
+basicConstraints = critical,CA:true
+
+authorityInfoAccess		= OCSP;URI:http://ocsp.CAcert.org/,caIssuers;URI:http://www.CAcert.org/ca.crt
+certificatePolicies		= @cert_policy_section_ca
+
+# Key usage: this is typical for a CA certificate. However since it will
+# prevent it being used as an test self-signed certificate it is best
+# left out by default.
+# keyUsage = cRLSign, keyCertSign
+
+# Some might want this also
+# nsCertType = sslCA, emailCA
+
+# Include email address in subject alt name: another PKIX recommendation
+# subjectAltName=email:copy
+# Copy issuer details
+# issuerAltName=issuer:copy
+
+# DER hex encoding of an extension: beware experts only!
+# obj=DER:02:03
+# Where 'obj' is a standard or added object
+# You can even override a supported extension:
+# basicConstraints= critical, DER:30:03:01:01:FF
+#
+[ cert_policy_section_ca ]
+CPS				= "http://www.CAcert.org/index.php?id=10"
+policyIdentifier		= my_policy_oid
+
+
+[ crl_ext ]
+
+# CRL extensions.
+# Only issuerAltName and authorityKeyIdentifier make any sense in a CRL.
+
+# issuerAltName=issuer:copy
+authorityKeyIdentifier=keyid:always
+
+[ proxy_cert_ext ]
+# These extensions should be added when creating a proxy certificate
+
+# This goes against PKIX guidelines but some CAs do it and some software
+# requires this to avoid interpreting an end user certificate as a CA.
+
+basicConstraints=CA:FALSE
+
+# Here are some examples of the usage of nsCertType. If it is omitted
+# the certificate can be used for anything *except* object signing.
+
+# This is OK for an SSL server.
+# nsCertType			= server
+
+# For an object signing certificate this would be used.
+# nsCertType = objsign
+
+# For normal client use this is typical
+# nsCertType = client, email
+
+# and for everything including object signing:
+# nsCertType = client, email, objsign
+
+# This is typical in keyUsage for a client certificate.
+# keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+
+# This will be displayed in Netscape's comment listbox.
+nsComment			= "OpenSSL Generated Certificate"
+
+# PKIX recommendations harmless if included in all certificates.
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer
+
+# This stuff is for subjectAltName and issuerAltname.
+# Import the email address.
+# subjectAltName=email:copy
+# An alternative to produce certificates that aren't
+# deprecated according to PKIX.
+# subjectAltName=email:move
+
+# Copy subject details
+# issuerAltName=issuer:copy
+
+#nsCaRevocationUrl		= http://www.domain.dom/ca-crl.pem
+#nsBaseUrl
+#nsRevocationUrl
+#nsRenewalUrl
+#nsCaPolicyUrl
+#nsSslServerName
+
+# This really needs to be in place for it to be a proxy certificate.
+proxyCertInfo=critical,language:id-ppl-anyLanguage,pathlen:3,policy:foo
+
+####################################################################
+[ tsa ]
+
+default_tsa = tsa_config1	# the default TSA section
+
+[ tsa_config1 ]
+
+# These are used by the TSA reply generation only.
+dir		= ./demoCA		# TSA root directory
+serial		= $dir/tsaserial	# The current serial number (mandatory)
+crypto_device	= builtin		# OpenSSL engine to use for signing
+signer_cert	= $dir/tsacert.pem 	# The TSA signing certificate
+					# (optional)
+certs		= $dir/cacert.pem	# Certificate chain to include in reply
+					# (optional)
+signer_key	= $dir/private/tsakey.pem # The TSA private key (optional)
+signer_digest  = sha256			# Signing digest to use. (Optional)
+default_policy	= tsa_policy1		# Policy if request did not specify it
+					# (optional)
+other_policies	= tsa_policy2, tsa_policy3	# acceptable policies (optional)
+digests     = sha1, sha256, sha384, sha512  # Acceptable message digests (mandatory)
+accuracy	= secs:1, millisecs:500, microsecs:100	# (optional)
+clock_precision_digits  = 0	# number of digits after dot. (optional)
+ordering		= yes	# Is ordering defined for timestamps?
+				# (optional, default: no)
+tsa_name		= yes	# Must the TSA name be included in the reply?
+				# (optional, default: no)
+ess_cert_id_chain	= no	# Must the ESS cert id chain be included?
+				# (optional, default: no)
+ess_cert_id_alg		= sha1	# algorithm to compute certificate
+				# identifier (optional, default: sha1)
+
+####################################################################
+#  Root CA
+####################################################################
+# openssl req -new \
+#    -config etc/root-ca.conf \
+#    -out ca/root-ca.csr \
+#    -keyout ca/root-ca/private/root-ca.key
+# `openssl req` for Root CA
+[ ca_reqext ]
+basicConstraints        = critical,CA:true
+subjectKeyIdentifier    = hash
+keyUsage                = critical,keyCertSign,cRLSign
+#
+# openssl ca -selfsign \
+#    -config etc/root-ca.conf \
+#    -in ca/root-ca.csr \
+#    -out ca/root-ca.crt \
+#    -extensions root_ca_ext \
+#    -enddate 20301231235959Z
+[ root_ca_ext ]
+# Add 'digitalSignature' to KU if OCSP uses this Root CA key
+basicConstraints        = critical,CA:true
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,keyCertSign,cRLSign
+
+######################################################################
+# Software CA
+######################################################################
+# used by `openssl req`
+# openssl req -new \
+#    -config etc/software-ca.conf \
+#    -out ca/software-ca.csr \
+#    -keyout ca/software-ca/private/software-ca.key
+# CNF file: software-ca.conf
+#     req_extension = ca_reqext
+[ ca_reqext ]
+basicConstraints        = critical,CA:true,pathlen:0
+subjectKeyIdentifier    = hash
+keyUsage                = critical,keyCertSign,cRLSign
+
+# used by 'openssl ca'
+# openssl ca \
+#    -config etc/root-ca.conf \
+#    -in ca/software-ca.csr \
+#    -out ca/software-ca.crt \
+#    -extensions signing_ca_ext
+# CNF file: root-ca.conf (or intCA.conf)
+[ signing_ca_ext ]
+basicConstraints        = critical,CA:true,pathlen:0
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,keyCertSign,cRLSign
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+
+######################################################################
+# TLS Signing (CA only)
+######################################################################
+# openssl req -new \
+#     -config etc/tls-ca.conf \
+#     -out ca/tls-ca.csr \
+#     -keyout ca/tls-ca/private/tls-ca.key
+# CNF File: tls-ca.conf
+#
+[ ca_reqext ]
+basicConstraints        = critical,CA:true,pathlen:0
+subjectKeyIdentifier    = hash
+keyUsage                = critical,keyCertSign,cRLSign
+
+#
+# openssl ca \
+#     -config etc/root-ca.conf \
+#     -in ca/tls-ca.csr \
+#     -out ca/tls-ca.crt \
+#     -extensions signing_ca_ext
+# CNF File: root-ca.cnf
+[ signing_ca_ext ]
+basicConstraints        = critical,CA:true,pathlen:0
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,keyCertSign,cRLSign
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+
+######################################################################
+# Email Protection CA
+######################################################################
+# used by `openssl req`
+# openssl req -new \
+#    -config etc/email-ca.conf \
+#    -out ca/email-ca.csr \
+#    -keyout ca/email-ca/private/email-ca.key
+# req_extensions = ca_reqext
+# CNF file: email-ca.conf
+[ ca_reqext ]
+basicConstraints        = critical,CA:true
+subjectKeyIdentifier    = hash
+keyUsage                = critical,keyCertSign,cRLSign
+
+# used by 'openssl ca'
+# CNF file: email-ca.conf (or intCA.conf)
+# openssl ca \
+#    -config etc/root-ca.conf \
+#    -in ca/email-ca.csr \
+#    -out ca/email-ca.crt \
+#    -extensions signing_ca_ext
+[ signing_ca_ext ]
+basicConstraints        = critical,CA:true,pathlen:0
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,keyCertSign,cRLSign
+extendedKeyUsage        = emailProtection,clientAuth
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+
+
+######################################################################
+# End of CA
+# Begin of Certificates
+######################################################################
+
+######################################################################
+# Code Signing certificate
+######################################################################
+#
+# openssl req -new \
+#    -config etc/codesign.conf \
+#    -out certs/software.csr \
+#    -keyout certs/software.key
+# CNF file: codesign.conf
+#     req_extensions          = codesign_reqext 
+[ codesign_reqext ]
+subjectKeyIdentifier    = hash
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = critical,codeSigning
+
+# openssl ca \
+#    -config etc/software-ca.conf \
+#    -in certs/software.csr \
+#    -out certs/software.crt \
+#    -extensions codesign_ext
+# CNF file: software-ca.conf
+[ codesign_ext ]
+basicConstraints        = CA:false
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = critical,codeSigning
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+
+
+###################################
+#  Email Protection certificates
+###################################
+# openssl req -new \
+#    -config etc/email.conf \
+#    -out certs/fred.csr \
+#    -keyout certs/fred.key
+# CNF File: email.conf
+#     req_extensions          = email_reqext
+[ email_reqext ]
+subjectKeyIdentifier    = hash
+keyUsage                = critical,digitalSignature,keyEncipherment
+extendedKeyUsage        = emailProtection,clientAuth
+subjectAltName          = email:move
+
+# openssl ca \
+#    -config etc/email-ca.conf \
+#    -in certs/fred.csr \
+#    -out certs/fred.crt \
+#    -extensions email_ext
+# CNF File: email-ca.conf
+[ email_ext ]
+basicConstraints        = CA:false
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,digitalSignature,keyEncipherment
+extendedKeyUsage        = emailProtection,clientAuth,anyExtendedKeyUsage
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+
+
+######################################################################
+# TLS Signing - Server certificate
+######################################################################
+# used by `openssl req`
+# SAN=DNS:green.no,DNS:www.green.no \
+# openssl req -new \
+#     -config etc/server.conf \
+#     -out certs/green.no.csr \
+#     -keyout certs/green.no.key
+# ENV::SAN makes it easier to pass hostname at command line
+# CNF file: server.conf
+[ server_reqext ]
+subjectKeyIdentifier    = hash
+keyUsage                = critical,digitalSignature,keyEncipherment
+extendedKeyUsage        = serverAuth,clientAuth
+subjectAltName          = ENV::SAN
+
+# Signed by tls-ca.conf
+# openssl ca \
+#    -config etc/tls-ca.conf \
+#    -in certs/green.no.csr \
+#    -out certs/green.no.crt \
+#    -extensions server_ext
+# CNF file: tls-ca.conf
+[ server_ext ]
+basicConstraints        = CA:false
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,digitalSignature,keyEncipherment
+extendedKeyUsage        = serverAuth,clientAuth
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+
+######################################################################
+# TLS Signing - Client
+######################################################################
+# used by `openssl req`
+# openssl req -new \
+#    -config etc/client.conf \
+#    -out certs/barney.csr \
+#    -keyout certs/barney.key
+#
+# CNF file: client.conf
+[ client_reqext ]
+subjectKeyIdentifier    = hash
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = clientAuth
+subjectAltName          = email:move
+
+# openssl ca \
+#    -config etc/tls-ca.conf \
+#    -in certs/barney.csr \
+#    -out certs/barney.crt \
+#    -policy extern_pol \
+#    -extensions client_ext
+# CNF file: tls-ca.conf
+[ client_ext ]
+basicConstraints        = CA:false
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always
+keyUsage                = critical,digitalSignature
+extendedKeyUsage        = clientAuth
+authorityInfoAccess     = @issuer_info
+crlDistributionPoints   = @crl_info
+
+
+######################################################################
+# OpenSSL default
+######################################################################
+[default_conf]
+ssl_conf = ssl_sect
+
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+MinProtocol = TLSv1.2
+CipherString = DEFAULT@SECLEVEL=2
+
