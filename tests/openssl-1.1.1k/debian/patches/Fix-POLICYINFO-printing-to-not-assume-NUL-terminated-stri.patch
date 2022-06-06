@@ -1,0 +1,43 @@
+From: Matt Caswell <matt@openssl.org>
+Date: Wed, 18 Aug 2021 12:31:38 +0100
+Subject: Fix POLICYINFO printing to not assume NUL terminated strings
+
+ASN.1 strings may not be NUL terminated. Don't assume they are.
+---
+ crypto/x509v3/v3_cpols.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/crypto/x509v3/v3_cpols.c b/crypto/x509v3/v3_cpols.c
+index 1d12c899125c..861e8455dd08 100644
+--- a/crypto/x509v3/v3_cpols.c
++++ b/crypto/x509v3/v3_cpols.c
+@@ -422,7 +422,8 @@ static void print_qualifiers(BIO *out, STACK_OF(POLICYQUALINFO) *quals,
+         qualinfo = sk_POLICYQUALINFO_value(quals, i);
+         switch (OBJ_obj2nid(qualinfo->pqualid)) {
+         case NID_id_qt_cps:
+-            BIO_printf(out, "%*sCPS: %s\n", indent, "",
++            BIO_printf(out, "%*sCPS: %.*s\n", indent, "",
++                       qualinfo->d.cpsuri->length,
+                        qualinfo->d.cpsuri->data);
+             break;
+ 
+@@ -447,7 +448,8 @@ static void print_notice(BIO *out, USERNOTICE *notice, int indent)
+     if (notice->noticeref) {
+         NOTICEREF *ref;
+         ref = notice->noticeref;
+-        BIO_printf(out, "%*sOrganization: %s\n", indent, "",
++        BIO_printf(out, "%*sOrganization: %.*s\n", indent, "",
++                   ref->organization->length,
+                    ref->organization->data);
+         BIO_printf(out, "%*sNumber%s: ", indent, "",
+                    sk_ASN1_INTEGER_num(ref->noticenos) > 1 ? "s" : "");
+@@ -470,7 +472,8 @@ static void print_notice(BIO *out, USERNOTICE *notice, int indent)
+         BIO_puts(out, "\n");
+     }
+     if (notice->exptext)
+-        BIO_printf(out, "%*sExplicit Text: %s\n", indent, "",
++        BIO_printf(out, "%*sExplicit Text: %.*s\n", indent, "",
++                   notice->exptext->length,
+                    notice->exptext->data);
+ }
+ 

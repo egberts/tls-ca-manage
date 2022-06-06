@@ -3,6 +3,9 @@
 # Used only during 'openssl ca' by those doing:
 #   - signing request such as OCSP server
 #   - signing request such as TLS serverAuth
+# 
+# Good References:
+# * https://www.golinuxcloud.com/add-x509-extensions-to-certificate-openssl/#Intermediate_Certificate_Extensions
 
 [ ca ]
 default_ca = int_ca
@@ -42,6 +45,10 @@ default_days      = 3000
 preserve          = no
 policy            = policy_loose
 
+# -extensions CLI option replaces x509_extensions=
+x509_extensions   = v3_OCSP;ocsp_ext
+
+
 [ policy_loose ]
 # Allow the intermediate CA to sign a more diverse range of certificates.
 # See the POLICY FORMAT section of the `ca` man page.
@@ -58,7 +65,15 @@ emailAddress            = optional
 # Extension for CRLs (`man x509v3_config`).
 authorityKeyIdentifier=keyid:always
 
-# 'ocsp' get evoked during 'openssl ca' for OCSP server cert
+[ v3_OCSP ]
+# Extension for OCSP signing certificates (`man ocsp`).
+basicConstraints = critical,CA:FALSE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+keyUsage = critical,nonRepudiation,digitalSignature,keyEncipherment
+extendedKeyUsage = critical, OCSPSigning
+authorityInfoAccess = @ocsp_info
+
 [ ocsp_ext ]
 # Extension for OCSP signing certificates (`man ocsp`).
 basicConstraints = CA:FALSE
@@ -68,6 +83,7 @@ authorityKeyIdentifier = keyid,issuer
 # OCSP KU=nonRepudiation  is for what?
 keyUsage = critical,digitalSignature
 extendedKeyUsage = critical, OCSPSigning
+
 
 [crl_info]
 URI.0 = http://crl.grilledcheese.us/whomovedmycheese.crl

@@ -1,3 +1,2 @@
 V	250813090000Z		01	unknown	/C=AU/ST=none/L=none/O=Internet Widgits Pty Ltd/OU=none/CN=none/emailAddress=none
-V	230318161355Z		02	unknown	/C=AU/ST=none/O=White Lab/OU=White Lab Centralized CA Division/CN=Root CA (common name)/emailAddress=none
-V	230318161538Z		03	unknown	/C=AU/ST=none/O=Internet Widgits Pty Ltd/OU=none/CN=none/emailAddress=none
+V	230318162344Z		02	unknown	/C=AU/ST=none/O=Internet Widgits Pty Ltd/OU=none/CN=none/emailAddress=none

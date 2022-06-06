@@ -1,0 +1,13 @@
+Package: libssl1.1-udeb
+Source: openssl
+Version: 1.1.1k-1+deb11u1
+Architecture: amd64
+Maintainer: Debian OpenSSL Team <pkg-openssl-devel@lists.alioth.debian.org>
+Installed-Size: 1806
+Depends: libc6-udeb (>= 2.33), libcrypto1.1-udeb (>= 1.1.1k)
+Section: debian-installer
+Priority: optional
+Description: ssl shared library - udeb
+ libssl shared library.
+ .
+ Do not install it on a normal system.

@@ -1,0 +1,44 @@
+From: Matt Caswell <matt@openssl.org>
+Date: Mon, 23 Aug 2021 13:56:22 +0100
+Subject: fixup! Allow fuzz builds to detect string overruns
+
+---
+ crypto/asn1/asn1_lib.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/crypto/asn1/asn1_lib.c b/crypto/asn1/asn1_lib.c
+index 2b61a7e57679..8e62f3307443 100644
+--- a/crypto/asn1/asn1_lib.c
++++ b/crypto/asn1/asn1_lib.c
+@@ -292,7 +292,12 @@ int ASN1_STRING_set(ASN1_STRING *str, const void *_data, int len_in)
+     }
+     if ((size_t)str->length <= len || str->data == NULL) {
+         c = str->data;
++#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
++        /* No NUL terminator in fuzzing builds */
++        str->data = OPENSSL_realloc(c, len);
++#else
+         str->data = OPENSSL_realloc(c, len + 1);
++#endif
+         if (str->data == NULL) {
+             ASN1err(ASN1_F_ASN1_STRING_SET, ERR_R_MALLOC_FAILURE);
+             str->data = c;
+@@ -302,15 +307,11 @@ int ASN1_STRING_set(ASN1_STRING *str, const void *_data, int len_in)
+     str->length = len;
+     if (data != NULL) {
+         memcpy(str->data, data, len);
+-        /* an allowance for strings :-) */
+-#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
++#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+         /*
+-         * Arbitrary byte on the end, which should never be read if the string
+-         * length is being properly respected.
++         * Add a NUL terminator. This should not be necessary - but we add it as
++         * a safety precaution
+          */
+-        str->data[len] = 'x';
+-#else
+-        /* This should not be necessary - but we add it as a safety precaution */
+         str->data[len] = '\0';
+ #endif
+     }

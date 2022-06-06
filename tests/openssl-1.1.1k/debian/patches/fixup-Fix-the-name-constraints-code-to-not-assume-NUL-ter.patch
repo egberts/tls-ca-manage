@@ -1,0 +1,89 @@
+From: Matt Caswell <matt@openssl.org>
+Date: Mon, 23 Aug 2021 14:01:08 +0100
+Subject: fixup! Fix the name constraints code to not assume NUL terminated
+ strings
+
+---
+ crypto/x509v3/v3_ncons.c | 36 +++++++++++-------------------------
+ 1 file changed, 11 insertions(+), 25 deletions(-)
+
+diff --git a/crypto/x509v3/v3_ncons.c b/crypto/x509v3/v3_ncons.c
+index 4cb05ac6ae73..cb701c4d844b 100644
+--- a/crypto/x509v3/v3_ncons.c
++++ b/crypto/x509v3/v3_ncons.c
+@@ -67,28 +67,13 @@ IMPLEMENT_ASN1_ALLOC_FUNCTIONS(NAME_CONSTRAINTS)
+ #define IA5_OFFSET_LEN(ia5base, offset) \
+     ((ia5base)->length - ((unsigned char *)(offset) - (ia5base)->data))
+ 
+-/* Like strchr but for ASN1_IA5STRING. Additionally you can specify the
++/* Like memchr but for ASN1_IA5STRING. Additionally you can specify the
+  * starting point to search from
+  */
+-static char *ia5strchr(ASN1_IA5STRING *str, const char *start, int c)
+-{
+-    int i;
+-    int offset = (int)(start - (char *)str->data);
++# define ia5memchr(str, start, c) memchr(start, c, IA5_OFFSET_LEN(str, start))
+ 
+-    /* Should not happen */
+-    if (offset > str->length || offset < 0)
+-        return NULL;
+-
+-    for (i = offset; i < str->length && str->data[i] != c; i++);
+-
+-    if (i == str->length)
+-        return NULL;
+-
+-    return (char *)&str->data[i];
+-}
+-
+-/* Like strrchr but for ASN1_IA5STRING */
+-static char *ia5strrchr(ASN1_IA5STRING *str, int c)
++/* Like memrrchr but for ASN1_IA5STRING */
++static char *ia5memrchr(ASN1_IA5STRING *str, int c)
+ {
+     int i;
+ 
+@@ -101,7 +86,8 @@ static char *ia5strrchr(ASN1_IA5STRING *str, int c)
+ }
+ 
+ /*
+- * We cannot use strncasecmp here because that applies locale specific rules.
++ * We cannot use strncasecmp here because that applies locale specific rules. It
++ * also doesn't work with ASN1_STRINGs that may have embedded NUL characters.
+  * For example in Turkish 'I' is not the uppercase character for 'i'. We need to
+  * do a simple ASCII case comparison ignoring the locale (that is why we use
+  * numeric constants below).
+@@ -594,8 +580,8 @@ static int nc_email(ASN1_IA5STRING *eml, ASN1_IA5STRING *base)
+ {
+     const char *baseptr = (char *)base->data;
+     const char *emlptr = (char *)eml->data;
+-    const char *baseat = ia5strrchr(base, '@');
+-    const char *emlat = ia5strrchr(eml, '@');
++    const char *baseat = ia5memrchr(base, '@');
++    const char *emlat = ia5memrchr(eml, '@');
+     size_t basehostlen, emlhostlen;
+ 
+     if (!emlat)
+@@ -638,7 +624,7 @@ static int nc_uri(ASN1_IA5STRING *uri, ASN1_IA5STRING *base)
+ {
+     const char *baseptr = (char *)base->data;
+     const char *hostptr = (char *)uri->data;
+-    const char *p = ia5strchr(uri, (char *)uri->data, ':');
++    const char *p = ia5memchr(uri, (char *)uri->data, ':');
+     int hostlen;
+ 
+     /* Check for foo:// and skip past it */
+@@ -653,10 +639,10 @@ static int nc_uri(ASN1_IA5STRING *uri, ASN1_IA5STRING *base)
+ 
+     /* Look for a port indicator as end of hostname first */
+ 
+-    p = ia5strchr(uri, hostptr, ':');
++    p = ia5memchr(uri, hostptr, ':');
+     /* Otherwise look for trailing slash */
+     if (p == NULL)
+-        p = ia5strchr(uri, hostptr, '/');
++        p = ia5memchr(uri, hostptr, '/');
+ 
+     if (p == NULL)
+         hostlen = IA5_OFFSET_LEN(uri, hostptr);

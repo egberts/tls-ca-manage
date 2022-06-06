@@ -1,0 +1,3 @@
+shlibs:Depends=libc6-udeb (>= 2.33), libcrypto1.1-udeb (>= 1.1.1k)
+misc:Depends=
+misc:Pre-Depends=

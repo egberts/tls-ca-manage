@@ -1,0 +1,4 @@
+debian/tmp/usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
+debian/tmp/usr/lib/x86_64-linux-gnu/libssl.so.1.1
+debian/tmp/usr/lib/x86_64-linux-gnu/engines-1.1/afalg.so
+debian/tmp/usr/lib/x86_64-linux-gnu/engines-1.1/padlock.so

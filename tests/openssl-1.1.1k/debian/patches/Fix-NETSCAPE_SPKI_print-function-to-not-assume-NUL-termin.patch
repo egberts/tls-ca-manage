@@ -1,0 +1,23 @@
+From: Matt Caswell <matt@openssl.org>
+Date: Thu, 19 Aug 2021 12:23:38 +0100
+Subject: Fix NETSCAPE_SPKI_print function to not assume NUL terminated
+ strings
+
+ASN.1 strings may not be NUL terminated. Don't assume they are.
+---
+ crypto/asn1/t_spki.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/crypto/asn1/t_spki.c b/crypto/asn1/t_spki.c
+index 51b56d0aa9f7..64ee77eeecba 100644
+--- a/crypto/asn1/t_spki.c
++++ b/crypto/asn1/t_spki.c
+@@ -38,7 +38,7 @@ int NETSCAPE_SPKI_print(BIO *out, NETSCAPE_SPKI *spki)
+     }
+     chal = spki->spkac->challenge;
+     if (chal->length)
+-        BIO_printf(out, "  Challenge String: %s\n", chal->data);
++        BIO_printf(out, "  Challenge String: %.*s\n", chal->length, chal->data);
+     i = OBJ_obj2nid(spki->sig_algor.algorithm);
+     BIO_printf(out, "  Signature Algorithm: %s",
+                (i == NID_undef) ? "UNKNOWN" : OBJ_nid2ln(i));

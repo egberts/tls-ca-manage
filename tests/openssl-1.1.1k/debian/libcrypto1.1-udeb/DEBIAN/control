@@ -1,0 +1,16 @@
+Package: libcrypto1.1-udeb
+Source: openssl
+Version: 1.1.1k-1+deb11u1
+Architecture: amd64
+Maintainer: Debian OpenSSL Team <pkg-openssl-devel@lists.alioth.debian.org>
+Installed-Size: 6808
+Depends: libc6-udeb (>= 2.33)
+Section: debian-installer
+Priority: optional
+Description: Secure Sockets Layer toolkit - libcrypto udeb
+ This package is part of the OpenSSL project's implementation of the SSL
+ and TLS cryptographic protocols for secure communication over the
+ Internet.
+ .
+ It contains a version of the libcrypto shared library for use with the
+ Debian Installer. Do not install it on a normal system.

@@ -1,0 +1,32 @@
+From: Matt Caswell <matt@openssl.org>
+Date: Thu, 19 Aug 2021 15:25:04 +0100
+Subject: Allow fuzz builds to detect string overruns
+
+If FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION is defined then we don't NUL
+terminate ASN1_STRING datatypes. This shouldn't be necessary but we add it
+any for safety in normal builds.
+---
+ crypto/asn1/asn1_lib.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/crypto/asn1/asn1_lib.c b/crypto/asn1/asn1_lib.c
+index 366afc5f6c6b..2b61a7e57679 100644
+--- a/crypto/asn1/asn1_lib.c
++++ b/crypto/asn1/asn1_lib.c
+@@ -303,7 +303,16 @@ int ASN1_STRING_set(ASN1_STRING *str, const void *_data, int len_in)
+     if (data != NULL) {
+         memcpy(str->data, data, len);
+         /* an allowance for strings :-) */
++#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
++        /*
++         * Arbitrary byte on the end, which should never be read if the string
++         * length is being properly respected.
++         */
++        str->data[len] = 'x';
++#else
++        /* This should not be necessary - but we add it as a safety precaution */
+         str->data[len] = '\0';
++#endif
+     }
+     return 1;
+ }

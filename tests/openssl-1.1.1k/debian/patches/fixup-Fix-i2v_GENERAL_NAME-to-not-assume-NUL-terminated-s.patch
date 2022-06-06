@@ -1,0 +1,28 @@
+From: Matt Caswell <matt@openssl.org>
+Date: Mon, 23 Aug 2021 20:41:38 +0100
+Subject: fixup! Fix i2v_GENERAL_NAME to not assume NUL terminated strings
+
+---
+ crypto/x509v3/v3_utl.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/crypto/x509v3/v3_utl.c b/crypto/x509v3/v3_utl.c
+index 706dd22ffaba..513dc68b0809 100644
+--- a/crypto/x509v3/v3_utl.c
++++ b/crypto/x509v3/v3_utl.c
+@@ -44,9 +44,12 @@ static int x509v3_add_len_value(const char *name, const char *value,
+ 
+     if (name != NULL && (tname = OPENSSL_strdup(name)) == NULL)
+         goto err;
+-    if (value != NULL) {
+-        /* We don't allow embeded NUL characters */
+-        if (memchr(value, 0, vallen) != NULL)
++    if (value != NULL && vallen > 0) {
++        /*
++         * We tolerate a single trailing NUL character, but otherwise no
++         * embedded NULs
++         */
++        if (memchr(value, 0, vallen - 1) != NULL)
+             goto err;
+         tvalue = OPENSSL_strndup(value, vallen);
+         if (tvalue == NULL)

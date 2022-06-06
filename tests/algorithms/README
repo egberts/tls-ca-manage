@@ -1,0 +1,8 @@
+Successful prototyping of creating TLS server authentication PKI for
+OCSP server-side
+
+But, with focus on splitting openssl.cnf into three files needed for tls-ca-manage:
+
+  - Parent Signer
+  - 'openssl req' for this node
+  - 'openssl ca' for this node

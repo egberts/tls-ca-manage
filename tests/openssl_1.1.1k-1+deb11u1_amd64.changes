@@ -1,0 +1,46 @@
+Format: 1.8
+Date: Tue, 24 Aug 2021 10:28:12 +0200
+Source: openssl
+Binary: libcrypto1.1-udeb libssl-dev libssl-doc libssl1.1 libssl1.1-udeb openssl
+Architecture: amd64 all
+Version: 1.1.1k-1+deb11u1
+Distribution: bullseye-security
+Urgency: medium
+Maintainer: Debian OpenSSL Team <pkg-openssl-devel@lists.alioth.debian.org>
+Changed-By: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
+Description:
+ libcrypto1.1-udeb - Secure Sockets Layer toolkit - libcrypto udeb (udeb)
+ libssl-dev - Secure Sockets Layer toolkit - development files
+ libssl-doc - Secure Sockets Layer toolkit - development documentation
+ libssl1.1  - Secure Sockets Layer toolkit - shared libraries
+ libssl1.1-udeb - ssl shared library - udeb (udeb)
+ openssl    - Secure Sockets Layer toolkit - cryptographic utility
+Changes:
+ openssl (1.1.1k-1+deb11u1) bullseye-security; urgency=medium
+ .
+   * CVE-2021-3711 (SM2 Decryption Buffer Overflow).
+   * CVE-2021-3712 (Read buffer overruns processing ASN.1 strings).
+Checksums-Sha1:
+ 474832b9c29a6785feae328f4850cf908b1482e0 1884004 libcrypto1.1-udeb_1.1.1k-1+deb11u1_amd64.udeb
+ a59473a3530cdf61f71d379077c49f9900ca1ccd 3265248 libssl-dev_1.1.1k-1+deb11u1_amd64.deb
+ 01469f68734bee9e1482c1e2cd7af3935b98a6f2 1751040 libssl-doc_1.1.1k-1+deb11u1_all.deb
+ 84de0b3a16ec6fe3e099e8fc4a30fee30cfc64e4 418664 libssl1.1-udeb_1.1.1k-1+deb11u1_amd64.udeb
+ 3041bc176dc468f5d7ae638d987d6ba7698c5394 2572144 libssl1.1_1.1.1k-1+deb11u1_amd64.deb
+ 6e53cbeddfd97bd9e7d0e4fe2357d5f55ee61422 6389 openssl_1.1.1k-1+deb11u1_amd64.buildinfo
+ 06d7914055b818088aa087c6e9f6c3afd7beb05e 1004480 openssl_1.1.1k-1+deb11u1_amd64.deb
+Checksums-Sha256:
+ afe6a38c86664833fd9623f3ac9f06176064708d3d465ad6c64cb5d48a11002c 1884004 libcrypto1.1-udeb_1.1.1k-1+deb11u1_amd64.udeb
+ f5703d1b11b013d393300586b8fd0a816c738e2ba23c5d9d9a7fc5c60fdd504d 3265248 libssl-dev_1.1.1k-1+deb11u1_amd64.deb
+ 37c3a961c126e73d2b4195f858837811a76ad2a811904afb4f093756a4ecc5ce 1751040 libssl-doc_1.1.1k-1+deb11u1_all.deb
+ 781625761f3075ae3b13c73a8a235f0ecf6fea4f7cc001d9eb9bf6e068cae11f 418664 libssl1.1-udeb_1.1.1k-1+deb11u1_amd64.udeb
+ fa9384440de3eb32141455a4c3276a7f98e0b47de686e24b0a19e38e45dbc221 2572144 libssl1.1_1.1.1k-1+deb11u1_amd64.deb
+ 5d6d0619b05c471ea2b1d33916733015160d835db6e2f3e9866566ec9ace8932 6389 openssl_1.1.1k-1+deb11u1_amd64.buildinfo
+ d1444fb844ce27e829d5e31c8f780f5509f53956da8fb8383007964583977631 1004480 openssl_1.1.1k-1+deb11u1_amd64.deb
+Files:
+ 51e307f65207d393d36f1c0d5fcc983d 1884004 debian-installer optional libcrypto1.1-udeb_1.1.1k-1+deb11u1_amd64.udeb
+ 4e492cff93ea0078a9c014d80c67b550 3265248 libdevel optional libssl-dev_1.1.1k-1+deb11u1_amd64.deb
+ f63a4733bbfc34a810c45bd53c5e6341 1751040 doc optional libssl-doc_1.1.1k-1+deb11u1_all.deb
+ bba332d4a4c29dbeaaeaf18fb3bee817 418664 debian-installer optional libssl1.1-udeb_1.1.1k-1+deb11u1_amd64.udeb
+ d1d1971b520a8409406b607bff875caa 2572144 libs optional libssl1.1_1.1.1k-1+deb11u1_amd64.deb
+ a713cf8e0748b575f851abc57c305bef 6389 utils optional openssl_1.1.1k-1+deb11u1_amd64.buildinfo
+ 52dd5b055f5025271110527ae99d9905 1004480 utils optional openssl_1.1.1k-1+deb11u1_amd64.deb

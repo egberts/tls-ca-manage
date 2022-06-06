@@ -1,0 +1,136 @@
+From: Matt Caswell <matt@openssl.org>
+Date: Wed, 18 Aug 2021 12:24:22 +0100
+Subject: Fix i2v_GENERAL_NAME to not assume NUL terminated strings
+
+ASN.1 strings may not be NUL terminated. Don't assume they are.
+---
+ crypto/x509v3/v3_alt.c | 10 +++++++---
+ crypto/x509v3/v3_utl.c | 35 +++++++++++++++++++++++++++++------
+ include/crypto/x509.h  |  5 +++++
+ 3 files changed, 41 insertions(+), 9 deletions(-)
+
+diff --git a/crypto/x509v3/v3_alt.c b/crypto/x509v3/v3_alt.c
+index 4dce0041012e..6e5f9f8b0eac 100644
+--- a/crypto/x509v3/v3_alt.c
++++ b/crypto/x509v3/v3_alt.c
+@@ -9,6 +9,7 @@
+ 
+ #include <stdio.h>
+ #include "internal/cryptlib.h"
++#include "crypto/x509.h"
+ #include <openssl/conf.h>
+ #include <openssl/x509v3.h>
+ #include "ext_dat.h"
+@@ -99,17 +100,20 @@ STACK_OF(CONF_VALUE) *i2v_GENERAL_NAME(X509V3_EXT_METHOD *method,
+         break;
+ 
+     case GEN_EMAIL:
+-        if (!X509V3_add_value_uchar("email", gen->d.ia5->data, &ret))
++        if (!x509v3_add_len_value_uchar("email", gen->d.ia5->data,
++                                        gen->d.ia5->length, &ret))
+             return NULL;
+         break;
+ 
+     case GEN_DNS:
+-        if (!X509V3_add_value_uchar("DNS", gen->d.ia5->data, &ret))
++        if (!x509v3_add_len_value_uchar("DNS", gen->d.ia5->data,
++                                        gen->d.ia5->length, &ret))
+             return NULL;
+         break;
+ 
+     case GEN_URI:
+-        if (!X509V3_add_value_uchar("URI", gen->d.ia5->data, &ret))
++        if (!x509v3_add_len_value_uchar("URI", gen->d.ia5->data,
++                                        gen->d.ia5->length, &ret))
+             return NULL;
+         break;
+ 
+diff --git a/crypto/x509v3/v3_utl.c b/crypto/x509v3/v3_utl.c
+index 7281a7b917a8..99add36a764a 100644
+--- a/crypto/x509v3/v3_utl.c
++++ b/crypto/x509v3/v3_utl.c
+@@ -12,6 +12,7 @@
+ #include "e_os.h"
+ #include "internal/cryptlib.h"
+ #include <stdio.h>
++#include <string.h>
+ #include "crypto/ctype.h"
+ #include <openssl/conf.h>
+ #include <openssl/crypto.h>
+@@ -34,17 +35,23 @@ static int ipv6_hex(unsigned char *out, const char *in, int inlen);
+ 
+ /* Add a CONF_VALUE name value pair to stack */
+ 
+-int X509V3_add_value(const char *name, const char *value,
+-                     STACK_OF(CONF_VALUE) **extlist)
++static int x509v3_add_len_value(const char *name, const char *value,
++                                size_t vallen, STACK_OF(CONF_VALUE) **extlist)
+ {
+     CONF_VALUE *vtmp = NULL;
+     char *tname = NULL, *tvalue = NULL;
+     int sk_allocated = (*extlist == NULL);
+ 
+-    if (name && (tname = OPENSSL_strdup(name)) == NULL)
+-        goto err;
+-    if (value && (tvalue = OPENSSL_strdup(value)) == NULL)
++    if (name != NULL && (tname = OPENSSL_strdup(name)) == NULL)
+         goto err;
++    if (value != NULL) {
++        /* We don't allow embeded NUL characters */
++        if (memchr(value, 0, vallen) != NULL)
++            goto err;
++        tvalue = OPENSSL_strndup(value, vallen);
++        if (tvalue == NULL)
++            goto err;
++    }
+     if ((vtmp = OPENSSL_malloc(sizeof(*vtmp))) == NULL)
+         goto err;
+     if (sk_allocated && (*extlist = sk_CONF_VALUE_new_null()) == NULL)
+@@ -67,10 +74,26 @@ int X509V3_add_value(const char *name, const char *value,
+     return 0;
+ }
+ 
++int X509V3_add_value(const char *name, const char *value,
++                     STACK_OF(CONF_VALUE) **extlist)
++{
++    return x509v3_add_len_value(name, value,
++                                value != NULL ? strlen((const char *)value) : 0,
++                                extlist);
++}
++
+ int X509V3_add_value_uchar(const char *name, const unsigned char *value,
+                            STACK_OF(CONF_VALUE) **extlist)
+ {
+-    return X509V3_add_value(name, (const char *)value, extlist);
++    return x509v3_add_len_value(name, (const char *)value,
++                                value != NULL ? strlen((const char *)value) : 0,
++                                extlist);
++}
++
++int x509v3_add_len_value_uchar(const char *name, const unsigned char *value,
++                               size_t vallen, STACK_OF(CONF_VALUE) **extlist)
++{
++    return x509v3_add_len_value(name, (const char *)value, vallen, extlist);
+ }
+ 
+ /* Free function for STACK_OF(CONF_VALUE) */
+diff --git a/include/crypto/x509.h b/include/crypto/x509.h
+index b53c2b03c39e..7ffb8abfe71b 100644
+--- a/include/crypto/x509.h
++++ b/include/crypto/x509.h
+@@ -8,6 +8,8 @@
+  */
+ 
+ #include "internal/refcount.h"
++#include <openssl/x509.h>
++#include <openssl/conf.h>
+ 
+ /* Internal X509 structures and functions: not for application use */
+ 
+@@ -284,3 +286,6 @@ int a2i_ipadd(unsigned char *ipout, const char *ipasc);
+ int x509_set1_time(ASN1_TIME **ptm, const ASN1_TIME *tm);
+ 
+ void x509_init_sig_info(X509 *x);
++
++int x509v3_add_len_value_uchar(const char *name, const unsigned char *value,
++                               size_t vallen, STACK_OF(CONF_VALUE) **extlist);

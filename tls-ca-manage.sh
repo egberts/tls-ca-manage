@@ -867,20 +867,25 @@ function get_x509v3_extension_by_ca_type {
       CNF_CA_EXT_CE="none"  # copy_extensions
       ;;
     root)
-      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
-      CNF_REQ_EXT_BC="critical,CA:true"
-      CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+      # CNF_REQ_EXT_BC="critical,CA:true"  # never use pathLen= on Root CAs
+      # digitalSignature MUST be added if Root private key for OCSP responses
+      # CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign,digitalSignature"  # keyUsage
+      # CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
+      # CNF_REQ_EXT_AKI="keyid:always,issuer"  # authorityKeyIdentifier
+      # CNF_REQ_EXT_EKU=""  # No extendedKeyUsage for Root CAs
       # root-ca.cnf/[root_ca_ext]
-      CNF_CA_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
-      CNF_CA_EXT_BC="critical,CA:true"  # basicConstraint
+      CNF_CA_EXT_BC="critical,CA:true"  # never use pathLen= on Root CAs
+      CNF_CA_EXT_KU="critical,keyCertSign,cRLSign,digitalSignature"  # keyUsage
       # TODO: User-prompt for the total depth of Intermediate CAs in advance?
-      #CNF_CA_EXT_BC="critical,CA:true,pathlen:0"  # basicConstraint
       CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+      CNF_CA_EXT_AKI="keyid:always,issuer"  # authorityKeyIdentifier
       CNF_CA_EXT_EKU=""  # extendedKeyUsage
+      CNF_CA_EXT_EKU=""  # No extendedKeyUsage for Root CAs
       CNF_CA_EXT_SAN=""  # subjectAltName
 # DO NOT INCLUDE authorityInfoAccess in ROOT CA; causes PRQP lookup-loop
       CNF_CA_EXT_AIA=""
+      # Add @ocsp_info to AIA if Root CA is signing OCSP Responder certs
+      CNF_CA_EXT_AIA="@ocsp_info"
       CNF_CA_EXT_CE="none"  # copy_extensions
       ;;
     intermediate)
@@ -891,15 +896,15 @@ function get_x509v3_extension_by_ca_type {
       #CNF_CA_EXT_BC="critical,CA:true,pathlen:0"  # basicConstraint
       CNF_REQ_EXT_SKI="hash" # subjectKeyIdentifier
       # root-ca.cnf/[root_ca_ext]
-      CNF_CA_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
-      CNF_CA_EXT_BC="critical,CA:true"  # basicConstraint
-      CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
-      CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
-      CNF_CA_EXT_EKU=""  # extendedKeyUsage
-      CNF_CA_EXT_SAN=""  # subjectAltName
-      CNF_CA_EXT_AIA="@issuer_info"
-      #shellcheck disable=SC2034
-      CNF_CA_EXT_CE="copy"  # copy_extensions
+      # CNF_CA_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage
+      # CNF_CA_EXT_BC="critical,CA:true"  # basicConstraint
+      # CNF_CA_EXT_SKI="hash" # subjectKeyIdentifier
+      # CNF_CA_EXT_AKI="keyid:always"  # authorityKeyIdentifier
+      # CNF_CA_EXT_EKU=""  # extendedKeyUsage
+      # CNF_CA_EXT_SAN=""  # subjectAltName
+      # CNF_CA_EXT_AIA="@issuer_info"
+      # #shellcheck disable=SC2034
+      # CNF_CA_EXT_CE="copy"  # copy_extensions
       ;;
 #    end|endnode|signing|network|software|tls)
 #      CNF_REQ_EXT_KU="critical,keyCertSign,cRLSign"  # keyUsage

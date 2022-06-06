@@ -1,0 +1,7 @@
+libcrypto1.1-udeb_1.1.1k-1+deb11u1_amd64.udeb debian-installer optional
+libssl-dev_1.1.1k-1+deb11u1_amd64.deb libdevel optional
+libssl-doc_1.1.1k-1+deb11u1_all.deb doc optional
+libssl1.1-udeb_1.1.1k-1+deb11u1_amd64.udeb debian-installer optional
+libssl1.1_1.1.1k-1+deb11u1_amd64.deb libs optional
+openssl_1.1.1k-1+deb11u1_amd64.buildinfo utils optional
+openssl_1.1.1k-1+deb11u1_amd64.deb utils optional

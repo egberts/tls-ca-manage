@@ -27,7 +27,7 @@ function assert_success() {
 echo "openssl genpkey -algorithm EC ..."
 openssl genpkey -algorithm EC   \
     -pkeyopt ec_paramgen_curve:P-521 \
-    -out ca.cheese.key.pem
+    -out ocsp.cheese.key.pem
 assert_success $?
 echo
 
@@ -70,9 +70,10 @@ echo
 echo "   prototype-ca-int-reset.sh"
 echo
 echo "And repeat this $0 command."
+#    -extensions ocsp_ext \
 openssl ca \
     -config ./openssl-intermediateCA-ca-ocsp.cnf \
-    -extensions ocsp_ext \
+    -extensions v3_OCSP \
     -days 365 \
     -notext \
     -md sha512 \

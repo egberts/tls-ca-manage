@@ -29,6 +29,7 @@ function assert_success() {
 # For CRL, there is no request
 # For CRL, just create the server-type PKI cert
 # For CRL, it is all about the preexisting intCA key/crt
+# For CTL, reads the parent CA's private key
 
 # strace -f 
 # openat(AT_FDCWD, "/usr/lib/ssl/openssl.cnf", O_RDONLY) = 3
@@ -49,6 +50,7 @@ openssl ca -config ./openssl-intermediateCA-ca-crl.cnf \
     -gencrl \
     -out ./whomovedmycheese.crl.pem
 assert_success $?
+echo
 
 
 # Verify the CRL
